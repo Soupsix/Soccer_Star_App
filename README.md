@@ -1,3 +1,6 @@
+# Soccer_Star_App
+A project to show user's favorite player and betting for him/match or other match
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
