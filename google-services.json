@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "9896985447",
+    "project_id": "soccer-star-app",
+    "storage_bucket": "soccer-star-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:9896985447:android:b52ef075f3943dc2d7e5c2",
+        "android_client_info": {
+          "package_name": "com.mma.soccerstar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCKcXrPemCcHlPebaN8j-bu80W7rdYDu0U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
