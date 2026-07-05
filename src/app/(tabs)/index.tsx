@@ -50,7 +50,7 @@ export default function HomeScreen() {
             <ThemedText style={styles.confidenceText}>Độ tin cậy: 89%</ThemedText>
             <TouchableOpacity
               style={[styles.predictBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push('/(tabs)/bet')}
+              onPress={() => router.push('/(tabs)/matches')}
             >
               <ThemedText style={styles.predictBtnText}>Đặt Cược Ngay</ThemedText>
             </TouchableOpacity>
