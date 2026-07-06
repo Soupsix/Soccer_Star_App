@@ -48,3 +48,6 @@ app-example
 
 # Firebase Admin Credentials
 scripts/service-account.json
+
+#Google API Key
+google-services.json
