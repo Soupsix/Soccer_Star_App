@@ -1,0 +1,129 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. Users Collection
+    // Stores user profile, virtual coin wallet balance, and settings
+    match /users/{userId} {
+      allow read: if isAuthenticated(); // Allowed to view profiles (e.g. for leaderboards)
+      allow write: if isOwner(userId); // Only the user can edit their own profile/coins
+      
+      // User's private mission progress
+      match /missions/{missionId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's reward claiming history
+      match /rewards/{rewardId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update, delete: if false; // Rewards should not be modified after claim
+      }
+    }
+
+    // 2. Bets Collection
+    // Stores virtual betting wagers placed by users
+    match /bets/{betId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if false; // Bets cannot be altered after placement (settlements are server-side)
+      allow delete: if false; // History must not be deleted
+    }
+
+    // 3. Transactions Collection
+    // Audit log for claims, bets, wins, and refunds
+    match /transactions/{txId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // 4. Notifications Collection
+    // Handles push/in-app alert updates
+    match /notifications/{notiId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.isRead == true;
+      allow create, delete: if false;
+    }
+
+    // 5. Tournaments & Leagues
+    // Public read-only, updated strictly by backend sync scripts
+    match /tournaments/{tournamentId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 6. Matches & Live Scores
+    // Public read-only, updated strictly by backend sync scripts
+    match /matches/{matchId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 7. Match Events Collection
+    // Public read-only, updated strictly by backend sync scripts
+    match /match_events/{eventId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 8. Teams Collection
+    // Public read-only, updated strictly by backend sync scripts
+    match /teams/{teamId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 9. Players Collection
+    // Public read-only, updated strictly by backend sync scripts
+    match /players/{playerId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 10. Stadiums Collection
+    // Public read-only, updated strictly by backend sync scripts
+    match /stadiums/{stadiumId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 11. Groups Collection (standings)
+    // Public read-only, updated strictly by backend sync scripts
+    match /groups/{groupId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 12. AI Recommendations & Predictions
+    // Public read-only for recommendations
+    match /predictions/{predictionId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 13. Global Leaderboards
+    // Read-only for all authenticated users
+    match /leaderboard/{leaderboardId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // 14. Sync Logs Collection
+    // Read-only for authenticated users
+    match /sync_logs/{logId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+  }
+}
