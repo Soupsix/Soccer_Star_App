@@ -45,3 +45,6 @@ app-example
 
 # IDEs and editors
 .idea/
+
+# Firebase Admin Credentials
+scripts/service-account.json
