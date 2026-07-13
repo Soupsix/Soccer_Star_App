@@ -3,10 +3,10 @@ import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useFavorites } from "@/hooks/use-favorites";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  Dimensions,
   FlatList,
   Image,
   ImageBackground,
@@ -15,106 +15,74 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 
 // Import local players data
 import playersData from "@/assets/data/players.json";
 
-const { width } = Dimensions.get("window");
-const CARD_WIDTH = (width - 60) / 2; // Grid 2 cột
-const CARD_HEIGHT = CARD_WIDTH * 1.45; // Tỷ lệ khoảng 3:4.35
-
-// Quốc gia viết tắt (FIFA code) và cờ quốc gia tương ứng
+// ─── Country mapping ──────────────────────────────────────────────────────────
 const COUNTRY_MAP: Record<string, { code: string; flag: string }> = {
-  Argentina: { code: "ARG", flag: "🇦🇷" },
-  Portugal: { code: "POR", flag: "🇵🇹" },
-  Norway: { code: "NOR", flag: "🇳🇴" },
-  France: { code: "FRA", flag: "🇫🇷" },
-  Spain: { code: "ESP", flag: "🇪🇸" },
-  England: { code: "ENG", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
-  Brazil: { code: "BRA", flag: "🇧🇷" },
-  Egypt: { code: "EGY", flag: "🇪🇬" },
-  Belgium: { code: "BEL", flag: "🇧🇪" },
-  Croatia: { code: "CRO", flag: "🇭🇷" },
-  Poland: { code: "POL", flag: "🇵🇱" },
-  "South Korea": { code: "KOR", flag: "🇰🇷" },
-  Germany: { code: "GER", flag: "🇩🇪" },
-  Uruguay: { code: "URU", flag: "🇺🇾" },
-  Senegal: { code: "SEN", flag: "🇸🇳" },
-  Nigeria: { code: "NGA", flag: "🇳🇬" },
-  Morocco: { code: "MAR", flag: "🇲🇦" },
-  Colombia: { code: "COL", flag: "🇨🇴" },
-  Netherlands: { code: "NED", flag: "🇳🇱" },
-  Ukraine: { code: "UKR", flag: "🇺🇦" },
-  Georgia: { code: "GEO", flag: "🇬🇪" },
-  Italy: { code: "ITA", flag: "🇮🇹" },
-  Austria: { code: "AUT", flag: "🇦🇹" },
+  Argentina:    { code: "ARG", flag: "🇦🇷" },
+  Portugal:     { code: "POR", flag: "🇵🇹" },
+  Norway:       { code: "NOR", flag: "🇳🇴" },
+  France:       { code: "FRA", flag: "🇫🇷" },
+  Spain:        { code: "ESP", flag: "🇪🇸" },
+  England:      { code: "ENG", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+  Brazil:       { code: "BRA", flag: "🇧🇷" },
+  Egypt:        { code: "EGY", flag: "🇪🇬" },
+  Belgium:      { code: "BEL", flag: "🇧🇪" },
+  Croatia:      { code: "CRO", flag: "🇭🇷" },
+  Poland:       { code: "POL", flag: "🇵🇱" },
+  "South Korea":{ code: "KOR", flag: "🇰🇷" },
+  Germany:      { code: "GER", flag: "🇩🇪" },
+  Uruguay:      { code: "URU", flag: "🇺🇾" },
+  Senegal:      { code: "SEN", flag: "🇸🇳" },
+  Nigeria:      { code: "NGA", flag: "🇳🇬" },
+  Morocco:      { code: "MAR", flag: "🇲🇦" },
+  Colombia:     { code: "COL", flag: "🇨🇴" },
+  Netherlands:  { code: "NED", flag: "🇳🇱" },
+  Ukraine:      { code: "UKR", flag: "🇺🇦" },
+  Georgia:      { code: "GEO", flag: "🇬🇪" },
+  Italy:        { code: "ITA", flag: "🇮🇹" },
+  Austria:      { code: "AUT", flag: "🇦🇹" },
 };
 
-// Định dạng ngày sinh từ YYYY-MM-DD sang DD-MM-YYYY
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatDate(dateStr: string): string {
   if (!dateStr) return "";
   const parts = dateStr.split("-");
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
+  if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
   return dateStr;
 }
 
-// Trích xuất năm sinh
 function getBirthYear(dateStr: string): string {
   if (!dateStr) return "2005";
   const parts = dateStr.split("-");
-  if (parts.length > 0) return parts[0];
-  return "2005";
+  return parts.length > 0 ? parts[0] : "2005";
 }
 
-// Hàm lấy thông số chiều cao, cân nặng giả lập cố định giống ảnh mẫu
 function getPlayerStats(name: string, id: string) {
-  const normalized = name.toLowerCase();
-  if (normalized.includes("messi")) {
-    return { height: "1,70", weight: "72" };
-  }
-  if (normalized.includes("ronaldo")) {
-    return { height: "1,87", weight: "83" };
-  }
-  if (normalized.includes("haaland")) {
-    return { height: "1,94", weight: "88" };
-  }
-  if (normalized.includes("mbappe")) {
-    return { height: "1,78", weight: "73" };
-  }
-  if (normalized.includes("yamal")) {
-    return { height: "1,80", weight: "72" };
-  }
-  if (normalized.includes("bellingham")) {
-    return { height: "1,86", weight: "75" };
-  }
-  if (normalized.includes("vinicius") || normalized.includes("vinícius")) {
+  const n = name.toLowerCase();
+  if (n.includes("messi"))     return { height: "1,70", weight: "72" };
+  if (n.includes("ronaldo"))   return { height: "1,87", weight: "83" };
+  if (n.includes("haaland"))   return { height: "1,94", weight: "88" };
+  if (n.includes("mbappe"))    return { height: "1,78", weight: "73" };
+  if (n.includes("yamal"))     return { height: "1,80", weight: "72" };
+  if (n.includes("bellingham"))return { height: "1,86", weight: "75" };
+  if (n.includes("vinicius") || n.includes("vinícius"))
     return { height: "1,76", weight: "74" };
-  }
-  if (normalized.includes("salah")) {
-    return { height: "1,75", weight: "71" };
-  }
-  if (normalized.includes("kane")) {
-    return { height: "1,88", weight: "86" };
-  }
-  if (normalized.includes("de bruyne")) {
-    return { height: "1,81", weight: "76" };
-  }
-
-  // Tạo thông số ngẫu nhiên cố định (deterministic) dựa trên tên cầu thủ
-  const hash = (name + id)
-    .split("")
-    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const heightNum = 1.7 + (hash % 25) / 100;
-  const weightNum = 65 + (hash % 25);
+  if (n.includes("salah"))     return { height: "1,75", weight: "71" };
+  if (n.includes("kane"))      return { height: "1,88", weight: "86" };
+  if (n.includes("de bruyne")) return { height: "1,81", weight: "76" };
+  const hash = (name + id).split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   return {
-    height: heightNum.toFixed(2).replace(".", ","),
-    weight: `${weightNum}`,
+    height: (1.7 + (hash % 25) / 100).toFixed(2).replace(".", ","),
+    weight: `${65 + (hash % 25)}`,
   };
 }
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Player {
   idPlayer: string;
   idTeam: string;
@@ -130,597 +98,448 @@ interface Player {
   position: string;
 }
 
-// Component Thẻ Cầu Thủ
-const PlayerCard = ({ player }: { player: Player }) => {
-  const router = useRouter();
+// ─── Responsive helpers ───────────────────────────────────────────────────────
+/** Returns the number of grid columns based on current screen width */
+function getNumColumns(width: number): number {
+  if (width >= 900) return 4;
+  if (width >= 600) return 3;
+  return 2;
+}
+
+/** Card width given total screen width and number of columns */
+function getCardWidth(screenWidth: number, cols: number): number {
+  const hPad = 16 * 2;        // listContent paddingHorizontal
+  const gap   = 12 * (cols - 1); // gaps between cards
+  return (screenWidth - hPad - gap) / cols;
+}
+
+// ─── PlayerCard ───────────────────────────────────────────────────────────────
+interface PlayerCardProps {
+  player: Player;
+  cardWidth: number;
+  isFav: boolean;
+  onToggleFav: (id: string) => void;
+}
+
+const PlayerCard = ({ player, cardWidth, isFav, onToggleFav }: PlayerCardProps) => {
+  const router      = useRouter();
   const colorScheme = useColorScheme() ?? "dark";
-  const colors = Colors[colorScheme];
-  const isDark = colorScheme === "dark";
+
+  const cardHeight = cardWidth * 1.45;
 
   const { code, flag } = useMemo(() => {
-    const nation = player.nationality;
-    return (
-      COUNTRY_MAP[nation] || {
-        code: nation.slice(0, 3).toUpperCase(),
-        flag: "⚽",
-      }
-    );
+    return COUNTRY_MAP[player.nationality] ?? {
+      code: player.nationality.slice(0, 3).toUpperCase(),
+      flag: "⚽",
+    };
   }, [player.nationality]);
 
-  const stats = useMemo(() => {
-    return getPlayerStats(player.name, player.idPlayer);
-  }, [player.name, player.idPlayer]);
-
-  const birthYear = useMemo(() => {
-    return getBirthYear(player.dateBorn);
-  }, [player.dateBorn]);
-
-  const dobStr = useMemo(() => {
-    return formatDate(player.dateBorn);
-  }, [player.dateBorn]);
-
-  // Phân loại hình ảnh: Ưu tiên ảnh cutout (không nền), nếu không có dùng thumb
-  const imageUrl = player.cutout || player.thumb;
+  const stats     = useMemo(() => getPlayerStats(player.name, player.idPlayer), [player.name, player.idPlayer]);
+  const birthYear = useMemo(() => getBirthYear(player.dateBorn), [player.dateBorn]);
+  const dobStr    = useMemo(() => formatDate(player.dateBorn), [player.dateBorn]);
+  const imageUrl  = player.cutout || player.thumb;
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={() =>
-        router.push(`/player/playerDetail?id=${player.idPlayer}` as any)
-      }
+    <View
       style={[
-        styles.cardContainer,
-        { borderColor: isDark ? "#30363D" : "#CFD8DC" },
+        styles.cardOuter,
+        {
+          width: cardWidth,
+          borderColor: colorScheme === "dark" ? "#30363D" : "#CFD8DC",
+        },
       ]}
     >
-      {/* Background mờ của thẻ để tăng tính chiều sâu */}
-      <ImageBackground
-        source={{ uri: player.thumb || player.cutout }}
-        style={styles.cardBg}
-        blurRadius={6}
-        imageStyle={{ opacity: 0.15 }}
+      {/* Tappable area: image + top badges */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => router.push(`/player/playerDetail?id=${player.idPlayer}` as any)}
+        style={styles.cardImageArea}
       >
-        {/* Header thẻ: Logo, Flag/Code quốc gia, năm sinh */}
-        <View style={styles.cardHeader}>
-          {/* Logo Soccer Star nhỏ */}
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoText}>🏆</Text>
-          </View>
-
-          {/* Cờ quốc gia & Tên viết tắt */}
-          <View style={styles.countryInfo}>
-            <View style={styles.codeBadge}>
-              <Text style={styles.codeText}>{code}</Text>
+        <ImageBackground
+          source={{ uri: player.thumb || player.cutout }}
+          style={styles.cardBg}
+          blurRadius={5}
+          imageStyle={{ opacity: 0.18 }}
+        >
+          {/* Header: flag + country code */}
+          <View style={styles.cardHeader}>
+            <View style={styles.logoBadge}>
+              <Text style={styles.logoText}>🏆</Text>
             </View>
-            <Text style={styles.flagEmoji}>{flag}</Text>
-          </View>
-        </View>
-
-        {/* Hộp năm sinh đặt dưới cờ */}
-        <View style={styles.yearContainer}>
-          <View style={styles.yearBox}>
-            <Text style={styles.yearText}>{birthYear}</Text>
-          </View>
-        </View>
-
-        {/* Ảnh cutout của cầu thủ nằm ở giữa */}
-        <View style={styles.playerImageContainer}>
-          {imageUrl ? (
-            <Image
-              source={{ uri: imageUrl }}
-              style={styles.playerImage}
-              resizeMode="contain"
-            />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <IconSymbol size={48} name="person.fill" color="#A0AEC0" />
-            </View>
-          )}
-        </View>
-
-        {/* Biểu ngữ trắng uốn lượn ở dưới cùng */}
-        <View style={styles.cardFooter}>
-          {/* Hộp ngày sinh nhỏ nhắn đè lên giữa biểu ngữ */}
-          <View style={styles.dobWrapper}>
-            <View style={styles.dobBox}>
-              <Text style={styles.dobText}>{dobStr}</Text>
+            <View style={styles.countryInfo}>
+              <View style={styles.codeBadge}>
+                <Text style={styles.codeText}>{code}</Text>
+              </View>
+              <Text style={styles.flagEmoji}>{flag}</Text>
             </View>
           </View>
 
-          {/* Tên cầu thủ viết hoa in đậm */}
-          <Text numberOfLines={1} style={styles.playerName}>
-            {player.name.toUpperCase()}
+          {/* Birth year chip */}
+          <View style={styles.yearChipWrap}>
+            <View style={styles.yearChip}>
+              <Text style={styles.yearText}>📅 {birthYear}</Text>
+            </View>
+          </View>
+
+          {/* Player image */}
+          <View style={styles.playerImageContainer}>
+            {imageUrl ? (
+              <Image source={{ uri: imageUrl }} style={styles.playerImage} resizeMode="contain" />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <IconSymbol size={48} name="person.fill" color="#A0AEC0" />
+              </View>
+            )}
+          </View>
+        </ImageBackground>
+      </TouchableOpacity>
+
+      {/* ── Footer: info + heart ── */}
+      <View style={styles.cardFooter}>
+        {/* DOB pill overlapping top edge */}
+        <View style={styles.dobWrapper}>
+          <View style={styles.dobBox}>
+            <Text style={styles.dobText}>{dobStr}</Text>
+          </View>
+        </View>
+
+        {/* Player name */}
+        <Text numberOfLines={1} style={styles.playerName}>
+          {player.name.toUpperCase()}
+        </Text>
+
+        {/* Team + position row */}
+        <View style={styles.infoRow}>
+          <Text numberOfLines={1} style={styles.teamText}>⚽ {player.team}</Text>
+          {player.position ? (
+            <View style={styles.positionBadge}>
+              <Text style={styles.positionText}>{player.position}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Stats row: height + weight */}
+        <View style={styles.statsRow}>
+          <View style={styles.statPill}>
+            <Text style={styles.statPillLabel}>Cao</Text>
+            <Text style={styles.statPillValue}>{stats.height}m</Text>
+          </View>
+          <View style={styles.statPill}>
+            <Text style={styles.statPillLabel}>Nặng</Text>
+            <Text style={styles.statPillValue}>{stats.weight}kg</Text>
+          </View>
+        </View>
+
+        {/* ❤️ Heart button — large + prominent */}
+        <TouchableOpacity
+          style={[
+            styles.heartButton,
+            isFav
+              ? styles.heartButtonActive
+              : styles.heartButtonInactive,
+          ]}
+          onPress={() => onToggleFav(player.idPlayer)}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.heartButtonIcon}>{isFav ? "❤️" : "🤍"}</Text>
+          <Text style={[styles.heartButtonLabel, { color: isFav ? "#E53E3E" : "#718096" }]}>
+            {isFav ? "Đã yêu thích" : "Yêu thích"}
           </Text>
-
-          {/* Tên Câu Lạc Bộ / Team */}
-          <View style={styles.teamBox}>
-            <Text numberOfLines={1} style={styles.teamText}>
-              {player.team}
-            </Text>
-          </View>
-
-          {/* Góc dưới bên phải: Chiều cao, cân nặng và nút tròn xanh */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statLine}>
-              <Text style={styles.statLabel}>m</Text>
-              <Text style={styles.statValue}>{stats.height}</Text>
-            </View>
-            <View style={styles.statLine}>
-              <Text style={styles.statLabel}>kg</Text>
-              <Text style={styles.statValue}>{stats.weight}</Text>
-            </View>
-          </View>
-
-          {/* Huy hiệu tròn xanh lục góc dưới */}
-          <View style={styles.greenBadge} />
-        </View>
-      </ImageBackground>
-    </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 };
 
+// ─── PlayersScreen ────────────────────────────────────────────────────────────
 export default function PlayersScreen() {
   const colorScheme = useColorScheme() ?? "dark";
-  const colors = Colors[colorScheme];
-  const isDark = colorScheme === "dark";
+  const colors      = Colors[colorScheme];
+  const { width }   = useWindowDimensions();
 
-  const [searchText, setSearchText] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6; // Hiển thị 6 cầu thủ mỗi trang
+  // Responsive grid
+  const numCols  = getNumColumns(width);
+  const cardWidth = getCardWidth(width, numCols);
 
-  // Hàm chuyển chữ có dấu thành không dấu phục vụ tìm kiếm chính xác
-  const searchNormalize = (text: string) => {
-    return text
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
-  };
+  const [searchText,   setSearchText]   = useState("");
+  const [currentPage,  setCurrentPage]  = useState(1);
+  const itemsPerPage = numCols * 3; // 3 rows per page
 
-  // Lọc danh sách cầu thủ dựa trên tìm kiếm
+  const { isFavorite, toggleFavorite } = useFavorites();
+
+  const searchNormalize = (text: string) =>
+    text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
   const filteredPlayers = useMemo(() => {
     const term = searchNormalize(searchText);
     if (!term) return playersData as Player[];
-
     return (playersData as Player[]).filter((p) => {
-      const nameNorm = searchNormalize(p.name);
-      const teamNorm = searchNormalize(p.team);
-      const positionNorm = searchNormalize(p.position);
-      const nationNorm = searchNormalize(p.nationality);
-
       return (
-        nameNorm.includes(term) ||
-        teamNorm.includes(term) ||
-        positionNorm.includes(term) ||
-        nationNorm.includes(term)
+        searchNormalize(p.name).includes(term)      ||
+        searchNormalize(p.team).includes(term)      ||
+        searchNormalize(p.position).includes(term)  ||
+        searchNormalize(p.nationality).includes(term)
       );
     });
   }, [searchText]);
 
-  // Tổng số trang
   const totalPages = Math.ceil(filteredPlayers.length / itemsPerPage) || 1;
 
-  // Reset trang hiện tại về 1 nếu thay đổi từ khóa tìm kiếm
   const handleSearchChange = (text: string) => {
     setSearchText(text);
     setCurrentPage(1);
   };
 
-  // Dữ liệu cầu thủ trang hiện tại
   const paginatedPlayers = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredPlayers.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredPlayers, currentPage]);
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredPlayers.slice(start, start + itemsPerPage);
+  }, [filteredPlayers, currentPage, itemsPerPage]);
 
-  const handlePrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage((prev) => prev - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage((prev) => prev + 1);
-    }
-  };
+  // Compute content max-width for wide screens
+  const isWide    = width >= 600;
+  const hPad      = isWide ? 32 : 20;
+  const maxWidth  = 1200;
 
   return (
     <ThemedView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <ThemedText type="title" style={styles.titleText}>
-          Siêu Sao Bóng Đá
-        </ThemedText>
-        <ThemedText style={{ color: "#A0AEC0", marginTop: 4 }}>
-          Danh sách cầu thủ
-        </ThemedText>
-      </View>
+      {/* Centred content wrapper for wide screens */}
+      <View style={[styles.contentWrapper, { maxWidth, alignSelf: "center", width: "100%" }]}>
 
-      {/* Tìm kiếm */}
-      <View
-        style={[
-          styles.searchSection,
-          { backgroundColor: colors.card, borderColor: colors.border },
-        ]}
-      >
-        <IconSymbol
-          size={20}
-          name="paperplane.fill"
-          color="#A0AEC0"
-          style={{ transform: [{ rotate: "45deg" }] }}
-        />
-        <TextInput
-          placeholder="Tìm kiếm cầu thủ, CLB, vị trí, quốc gia..."
-          placeholderTextColor="#718096"
-          value={searchText}
-          onChangeText={handleSearchChange}
-          style={[styles.searchInput, { color: colors.text }]}
-        />
-        {searchText.length > 0 && (
-          <TouchableOpacity onPress={() => handleSearchChange("")}>
-            <IconSymbol size={18} name="chevron.right" color="#A0AEC0" />
-          </TouchableOpacity>
-        )}
-      </View>
+        {/* Header */}
+        <View style={[styles.header, { paddingHorizontal: hPad }]}>
+          <ThemedText type="title" style={[styles.titleText, { fontSize: isWide ? 30 : 26 }]}>
+            Siêu Sao Bóng Đá
+          </ThemedText>
+          <ThemedText style={{ color: "#A0AEC0", marginTop: 4 }}>
+            Danh sách cầu thủ
+          </ThemedText>
+        </View>
 
-      {/* Kết quả lọc */}
-      <View style={styles.resultSummary}>
-        <ThemedText style={styles.resultText}>
-          Tìm thấy{" "}
-          <Text style={{ color: colors.primary, fontWeight: "bold" }}>
-            {filteredPlayers.length}
-          </Text>{" "}
-          siêu sao
-        </ThemedText>
-      </View>
-
-      {/* Lưới thẻ cầu thủ */}
-      <FlatList
-        data={paginatedPlayers}
-        keyExtractor={(item) => item.idPlayer}
-        numColumns={2}
-        columnWrapperStyle={styles.rowWrapper}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => <PlayerCard player={item} />}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <IconSymbol size={48} name="person.fill" color="#A0AEC0" />
-            <ThemedText style={styles.emptyText}>
-              Không tìm thấy cầu thủ nào phù hợp!
-            </ThemedText>
-          </View>
-        }
-      />
-
-      {/* Phân trang ở chân trang */}
-      {filteredPlayers.length > 0 && (
+        {/* Search */}
         <View
           style={[
-            styles.paginationContainer,
-            { backgroundColor: colors.background },
+            styles.searchSection,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              marginHorizontal: hPad,
+              height: isWide ? 52 : 48,
+            },
           ]}
         >
-          <TouchableOpacity
-            onPress={handlePrevPage}
-            disabled={currentPage === 1}
-            style={[
-              styles.pageButton,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              currentPage === 1 && { opacity: 0.4 },
-            ]}
-          >
-            <IconSymbol
-              size={20}
-              name="chevron.left.forwardslash.chevron.right"
-              color={colors.text}
-              style={{ transform: [{ rotate: "180deg" }] }}
-            />
-            <Text
-              style={[
-                styles.pageButtonText,
-                { color: colors.text, marginLeft: 4 },
-              ]}
-            >
-              Trước
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.pageIndicator}>
-            <ThemedText style={styles.pageText}>
-              Trang{" "}
-              <Text style={{ fontWeight: "bold", color: colors.primary }}>
-                {currentPage}
-              </Text>{" "}
-              / {totalPages}
-            </ThemedText>
-          </View>
-
-          <TouchableOpacity
-            onPress={handleNextPage}
-            disabled={currentPage === totalPages}
-            style={[
-              styles.pageButton,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              currentPage === totalPages && { opacity: 0.4 },
-            ]}
-          >
-            <Text
-              style={[
-                styles.pageButtonText,
-                { color: colors.text, marginRight: 4 },
-              ]}
-            >
-              Sau
-            </Text>
-            <IconSymbol size={20} name="chevron.right" color={colors.text} />
-          </TouchableOpacity>
+          <IconSymbol size={20} name="paperplane.fill" color="#A0AEC0" style={{ transform: [{ rotate: "45deg" }] }} />
+          <TextInput
+            placeholder="Tìm kiếm cầu thủ, CLB, vị trí, quốc gia..."
+            placeholderTextColor="#718096"
+            value={searchText}
+            onChangeText={handleSearchChange}
+            style={[styles.searchInput, { color: colors.text, fontSize: isWide ? 15 : 14 }]}
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={() => handleSearchChange("")}>
+              <IconSymbol size={18} name="chevron.right" color="#A0AEC0" />
+            </TouchableOpacity>
+          )}
         </View>
-      )}
+
+        {/* Result count */}
+        <View style={[styles.resultSummary, { paddingHorizontal: hPad }]}>
+          <ThemedText style={styles.resultText}>
+            Tìm thấy{" "}
+            <Text style={{ color: colors.primary, fontWeight: "bold" }}>
+              {filteredPlayers.length}
+            </Text>{" "}
+            siêu sao
+          </ThemedText>
+        </View>
+
+        {/* Player grid */}
+        <FlatList
+          key={`grid-${numCols}`}            // force re-render when columns change
+          data={paginatedPlayers}
+          keyExtractor={(item) => item.idPlayer}
+          numColumns={numCols}
+          columnWrapperStyle={numCols > 1 ? { gap: 12, marginBottom: 12 } : undefined}
+          contentContainerStyle={[styles.listContent, { paddingHorizontal: hPad }]}
+          renderItem={({ item }) => (
+            <PlayerCard
+              player={item}
+              cardWidth={cardWidth}
+              isFav={isFavorite(item.idPlayer)}
+              onToggleFav={toggleFavorite}
+            />
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <IconSymbol size={48} name="person.fill" color="#A0AEC0" />
+              <ThemedText style={styles.emptyText}>Không tìm thấy cầu thủ nào phù hợp!</ThemedText>
+            </View>
+          }
+        />
+
+        {/* Pagination */}
+        {filteredPlayers.length > 0 && (
+          <View style={[styles.paginationContainer, { backgroundColor: colors.background, paddingHorizontal: hPad }]}>
+            <TouchableOpacity
+              onPress={() => currentPage > 1 && setCurrentPage((p) => p - 1)}
+              disabled={currentPage === 1}
+              style={[styles.pageButton, { backgroundColor: colors.card, borderColor: colors.border }, currentPage === 1 && { opacity: 0.4 }]}
+            >
+              <IconSymbol size={16} name="chevron.left" color={colors.text} />
+              <Text style={[styles.pageButtonText, { color: colors.text, marginLeft: 4 }]}>Trước</Text>
+            </TouchableOpacity>
+
+            <View style={styles.pageIndicator}>
+              <ThemedText style={styles.pageText}>
+                Trang{" "}
+                <Text style={{ fontWeight: "bold", color: colors.primary }}>{currentPage}</Text>
+                {" "}/ {totalPages}
+              </ThemedText>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => currentPage < totalPages && setCurrentPage((p) => p + 1)}
+              disabled={currentPage === totalPages}
+              style={[styles.pageButton, { backgroundColor: colors.card, borderColor: colors.border }, currentPage === totalPages && { opacity: 0.4 }]}
+            >
+              <Text style={[styles.pageButtonText, { color: colors.text, marginRight: 4 }]}>Sau</Text>
+              <IconSymbol size={16} name="chevron.right" color={colors.text} />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </ThemedView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 60,
+  container:      { flex: 1, paddingTop: 60 },
+  contentWrapper: { flex: 1 },
+
+  header:         { marginBottom: 16 },
+  titleText:      { fontWeight: "bold" },
+
+  searchSection:  {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, marginBottom: 10,
   },
-  header: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  searchInput:    { flex: 1, height: "100%", marginLeft: 10 },
+
+  resultSummary:  { marginBottom: 10 },
+  resultText:     { fontSize: 14, color: "#A0AEC0" },
+
+  listContent:    { paddingBottom: 80 },
+
+  emptyContainer: { alignItems: "center", justifyContent: "center", paddingVertical: 60 },
+  emptyText:      { marginTop: 10, color: "#A0AEC0", fontSize: 15 },
+
+  // ── Card outer (column layout: image on top, footer below) ──────────────────
+  cardOuter: {
+    borderRadius: 14, borderWidth: 1.5, overflow: "hidden",
+    backgroundColor: "#FFFFFF", elevation: 4,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12, shadowRadius: 6,
   },
-  titleText: {
-    fontSize: 26,
-    fontWeight: "bold",
+  cardImageArea: {
+    height: 160,        // fixed image zone height
   },
-  searchSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 20,
-    paddingHorizontal: 12,
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  searchInput: {
-    flex: 1,
-    height: "100%",
-    marginLeft: 10,
-    fontSize: 14,
-  },
-  resultSummary: {
-    paddingHorizontal: 20,
-    marginBottom: 10,
-  },
-  resultText: {
-    fontSize: 14,
-    color: "#A0AEC0",
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 80,
-  },
-  rowWrapper: {
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-  },
-  emptyText: {
-    marginTop: 10,
-    color: "#A0AEC0",
-    fontSize: 15,
-  },
-  // Style cho Thẻ Cầu Thủ
-  cardContainer: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    overflow: "hidden",
-    backgroundColor: "#FFFFFF",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  cardBg: {
-    flex: 1,
-    padding: 6,
-    justifyContent: "space-between",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+  cardBg:         { flex: 1, padding: 6, justifyContent: "space-between" },
+  cardHeader:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+
   logoBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#ECEFF1",
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.92)", alignItems: "center",
+    justifyContent: "center", borderWidth: 1, borderColor: "#ECEFF1",
   },
-  logoText: {
-    fontSize: 12,
-  },
-  countryInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  logoText:   { fontSize: 13 },
+  countryInfo:{ flexDirection: "row", alignItems: "center" },
   codeBadge: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#B0BEC5",
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 4,
-    marginRight: 4,
+    backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#B0BEC5",
+    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, marginRight: 4,
   },
-  codeText: {
-    fontSize: 8,
-    fontWeight: "bold",
-    color: "#37474F",
+  codeText:   { fontSize: 9, fontWeight: "bold", color: "#37474F" },
+  flagEmoji:  { fontSize: 18 },
+
+  yearChipWrap:{ alignItems: "flex-start", marginTop: 2 },
+  yearChip: {
+    backgroundColor: "rgba(255,255,255,0.85)", borderRadius: 6,
+    paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: "#B0BEC5",
   },
-  flagEmoji: {
-    fontSize: 16,
-  },
-  yearContainer: {
-    alignItems: "flex-end",
-    marginTop: -2,
-    marginRight: 2,
-  },
-  yearBox: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#B0BEC5",
-    paddingHorizontal: 4,
-    borderRadius: 4,
-  },
-  yearText: {
-    fontSize: 8,
-    fontWeight: "bold",
-    color: "#37474F",
-  },
-  playerImageContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: -10,
-    zIndex: 1,
-  },
-  playerImage: {
-    width: "90%",
-    height: "100%",
-  },
+  yearText:   { fontSize: 9, fontWeight: "bold", color: "#37474F" },
+
+  // Player image
+  playerImageContainer: { flex: 1, alignItems: "center", justifyContent: "center", zIndex: 1 },
+  playerImage:  { width: "85%", height: "100%" },
   avatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#E2E8F0",
-    alignItems: "center",
-    justifyContent: "center",
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: "#E2E8F0", alignItems: "center", justifyContent: "center",
   },
+
+  // ── Footer (info + heart) ─────────────────────────────────────────────────
   cardFooter: {
-    height: 56,
     backgroundColor: "#ECEFF1",
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    paddingHorizontal: 6,
-    paddingTop: 8,
+    borderTopWidth: 1, borderTopColor: "#CFD8DC",
+    paddingHorizontal: 10, paddingTop: 14, paddingBottom: 10,
     alignItems: "center",
     position: "relative",
-    zIndex: 2,
-    borderWidth: 1,
-    borderColor: "#CFD8DC",
   },
-  dobWrapper: {
-    position: "absolute",
-    top: -8,
-    alignSelf: "center",
-    zIndex: 3,
-  },
+
+  // DOB pill sits over the top border
+  dobWrapper:   { position: "absolute", top: -10, alignSelf: "center", zIndex: 3 },
   dobBox: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#B0BEC5",
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 10,
+    backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#B0BEC5",
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10,
   },
-  dobText: {
-    fontSize: 7,
-    fontWeight: "bold",
-    color: "#37474F",
-  },
+  dobText: { fontSize: 9, fontWeight: "bold", color: "#37474F" },
+
+  // Name
   playerName: {
-    fontSize: 10,
-    fontWeight: "bold",
-    color: "#1A202C",
-    textAlign: "center",
-    marginBottom: 2,
+    fontSize: 12, fontWeight: "800", color: "#1A202C",
+    textAlign: "center", marginBottom: 4, letterSpacing: 0.3,
   },
-  teamBox: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 0.5,
-    borderColor: "#CFD8DC",
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 3,
-    maxWidth: "90%",
+
+  // Team + position
+  infoRow:      { flexDirection: "row", alignItems: "center", flexWrap: "wrap", justifyContent: "center", gap: 4, marginBottom: 6 },
+  teamText:     { fontSize: 10, color: "#4A5568", fontWeight: "600" },
+  positionBadge:{ backgroundColor: "#2F80ED20", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  positionText: { fontSize: 9, color: "#2F80ED", fontWeight: "700" },
+
+  // Stats row
+  statsRow:     { flexDirection: "row", gap: 8, marginBottom: 10 },
+  statPill: {
+    flexDirection: "row", alignItems: "baseline", gap: 2,
+    backgroundColor: "#FFFFFF", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3,
+    borderWidth: 1, borderColor: "#CFD8DC",
   },
-  teamText: {
-    fontSize: 7,
-    color: "#4A5568",
-    textAlign: "center",
-    fontWeight: "600",
+  statPillLabel:{ fontSize: 9, color: "#718096" },
+  statPillValue:{ fontSize: 10, fontWeight: "800", color: "#2D3748" },
+
+  // ❤️ Heart button — full-width pill
+  heartButton: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    width: "100%", height: 34, borderRadius: 17,
+    borderWidth: 1.5, gap: 6,
   },
-  statsContainer: {
-    position: "absolute",
-    bottom: 4,
-    right: 18,
-    alignItems: "flex-start",
+  heartButtonActive: {
+    backgroundColor: "#FFF5F5", borderColor: "#FC8181",
   },
-  statLine: {
-    flexDirection: "row",
-    alignItems: "center",
+  heartButtonInactive: {
+    backgroundColor: "#FFFFFF", borderColor: "#CBD5E0",
   },
-  statLabel: {
-    fontSize: 7,
-    color: "#718096",
-    marginRight: 2,
-  },
-  statValue: {
-    fontSize: 7,
-    fontWeight: "bold",
-    color: "#2D3748",
-  },
-  greenBadge: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#00C853",
-    position: "absolute",
-    bottom: 8,
-    right: 6,
-  },
+  heartButtonIcon:  { fontSize: 18 },
+  heartButtonLabel: { fontSize: 12, fontWeight: "700" },
+
   // Pagination
   paginationContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(0,0,0,0.05)",
+    height: 60, flexDirection: "row", justifyContent: "space-between",
+    alignItems: "center", borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.05)",
   },
   pageButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    flexDirection: "row", alignItems: "center",
+    borderWidth: 1, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12,
   },
-  pageButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  pageIndicator: {
-    alignItems: "center",
-  },
-  pageText: {
-    fontSize: 13,
-  },
+  pageButtonText: { fontSize: 12, fontWeight: "600" },
+  pageIndicator:  { alignItems: "center" },
+  pageText:       { fontSize: 13 },
 });
