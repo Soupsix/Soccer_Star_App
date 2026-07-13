@@ -195,19 +195,34 @@ export default function HomeScreen() {
                 </Text>
               </View>
 
-              <Pressable
-                onPress={onRefresh}
-                style={({ pressed }) => [
-                  styles.refreshButton,
-                  {
-                    borderColor: colors.border,
-                    backgroundColor: colors.card,
-                    opacity: pressed ? 0.78 : 1,
-                  },
-                ]}
-              >
-                <Ionicons name="refresh" size={18} color={colors.primary} />
-              </Pressable>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Pressable
+                  onPress={() => router.push('/notifications')}
+                  style={({ pressed }) => [
+                    styles.refreshButton,
+                    {
+                      borderColor: colors.border,
+                      backgroundColor: colors.card,
+                      opacity: pressed ? 0.78 : 1,
+                    },
+                  ]}
+                >
+                  <Ionicons name="notifications-outline" size={18} color={colors.primary} />
+                </Pressable>
+                <Pressable
+                  onPress={onRefresh}
+                  style={({ pressed }) => [
+                    styles.refreshButton,
+                    {
+                      borderColor: colors.border,
+                      backgroundColor: colors.card,
+                      opacity: pressed ? 0.78 : 1,
+                    },
+                  ]}
+                >
+                  <Ionicons name="refresh" size={18} color={colors.primary} />
+                </Pressable>
+              </View>
             </View>
           }
           ListEmptyComponent={

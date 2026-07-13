@@ -1,6 +1,6 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -13,12 +13,16 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
+  TextInput,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useAuthUser } from "@/hooks/use-auth-user";
+import { useFavorites } from "@/hooks/use-favorites";
 
 const { width } = Dimensions.get("window");
 
@@ -160,10 +164,23 @@ export default function PlayerDetailScreen() {
   const colors = Colors[colorScheme];
   const isDark = colorScheme === "dark";
 
+  const { user } = useAuthUser();
+  const { favorites, toggleFavorite } = useFavorites();
   const [player, setPlayer] = useState<RawPlayer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [showFullBio, setShowFullBio] = useState(false);
+
+  const isFavorited = id && favorites.includes(id as string);
+
+  const handleToggleFavorite = async () => {
+    if (!id) return;
+    try {
+      await toggleFavorite(id as string);
+    } catch (err) {
+      console.error("Lỗi khi yêu thích cầu thủ:", err);
+    }
+  };
 
   const [clubLogo, setClubLogo] = useState<string | null>(null);
   const [nationalLogo, setNationalLogo] = useState<string | null>(null);
@@ -451,12 +468,24 @@ export default function PlayerDetailScreen() {
                 </Text>
               )}
             </View>
+            <TouchableOpacity
+              style={[
+                styles.followBtn,
+                { backgroundColor: isFavorited ? 'transparent' : colors.primary, borderColor: colors.primary, borderWidth: isFavorited ? 1 : 0, paddingHorizontal: 16 }
+              ]}
+              onPress={handleToggleFavorite}
+            >
+              <FontAwesome name={isFavorited ? 'heart' : 'heart-o'} size={18} color={isFavorited ? colors.primary : '#FFF'} />
+              <Text style={[styles.followBtnText, { color: isFavorited ? colors.primary : '#FFF', marginLeft: 8 }]}>
+                {isFavorited ? 'Đã yêu thích' : 'Yêu thích'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* CONTAINER NỘI DUNG CHÍNH (Có padding để tránh đè lấn) */}
         <View style={styles.mainContent}>
-          {/* PHẦN LOGO ĐỘI BÓNG & ĐỘI TUYỂN (Chia 2 cột đẹp mắt) */}
+              {/* PHẦN LOGO ĐỘI BÓNG & ĐỘI TUYỂN (Chia 2 cột đẹp mắt) */}
           <View style={styles.logoGridRow}>
             {/* Cột 1: Câu Lạc Bộ */}
             {player.strTeam && (
@@ -823,6 +852,7 @@ export default function PlayerDetailScreen() {
               </View>
             </View>
           )}
+
         </View>
       </ScrollView>
     </ThemedView>
@@ -1194,6 +1224,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginLeft: 8,
   },
+  followBtn: {
+    marginTop: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 120,
+  },
+  followBtnText: {
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
 
   // CONTENT LAYOUT
   mainContent: {
@@ -1490,5 +1533,122 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(113, 128, 150, 0.1)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  
+  // TABS
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTabButton: {},
+  tabButtonText: {
+    fontSize: 14,
+    color: '#A0AEC0',
+  },
+
+  // TIMELINE
+  timelineSection: {
+    marginTop: 16,
+    width: "100%",
+  },
+  timelineHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  timelineTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  timelineSubtitle: {
+    fontSize: 12,
+    color: "#A0AEC0",
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  quickPostCard: {
+    flexDirection: "row",
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 8,
+    marginBottom: 16,
+    gap: 8,
+    alignItems: "center",
+  },
+  quickPostInput: {
+    flex: 1,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 13,
+  },
+  quickPostBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTimelineCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderStyle: "dashed",
+    marginBottom: 16,
+  },
+  emptyTimelineText: {
+    fontSize: 12,
+    color: "#A0AEC0",
+    textAlign: "center",
+  },
+  timelineCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 12,
+  },
+  timelineCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 10,
+  },
+  timelineAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  timelineAvatarPlaceholder: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  timelineUserName: {
+    fontWeight: "bold",
+    fontSize: 13,
+  },
+  timelineTimeText: {
+    fontSize: 10,
+    color: "#718096",
+  },
+  timelineNoteText: {
+    fontSize: 14,
+    fontStyle: "italic",
+    lineHeight: 18,
   },
 });

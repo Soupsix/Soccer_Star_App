@@ -1,148 +1,50 @@
 import { 
-  collection, 
   doc, 
   getDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
   setDoc 
 } from 'firebase/firestore';
 import { db, auth } from '@/services/firebase';
+import { FootballDataService } from '@/services/footballData.service';
+import playersData from '@/assets/data/players.json';
 import { HomeMatch, HomePlayer, AIRecommendation } from '../types/home.types';
 
 export class HomeService {
-  // In-memory caches to prevent duplicate Firestore requests
-  private static tournamentCache: Record<string, string> = {};
-  private static teamCache: Record<string, string> = {};
-  private static teamLogoCache: Record<string, string> = {};
-
-  /**
-   * Helper to print database stats for debugging purposes.
-   */
-  private static async logDbStats(): Promise<void> {
-    try {
-      const tourneys = await getDocs(collection(db, 'tournaments'));
-      const teams = await getDocs(collection(db, 'teams'));
-      const matches = await getDocs(collection(db, 'matches'));
-      const players = await getDocs(collection(db, 'players'));
-
-      console.log(`[HomeService Debug] --- Firestore DB Stats ---`);
-      console.log(`[HomeService Debug] Tournaments loaded: ${tourneys.size}`);
-      console.log(`[HomeService Debug] Teams loaded: ${teams.size}`);
-      console.log(`[HomeService Debug] Matches loaded: ${matches.size}`);
-      console.log(`[HomeService Debug] Players loaded: ${players.size}`);
-      console.log(`[HomeService Debug] --------------------------`);
-    } catch (err) {
-      console.error("[HomeService Debug] Error fetching DB stats:", err);
-    }
-  }
-
-  /**
-   * Resolves a tournament name from a tournamentId.
-   */
-  private static async resolveTournamentName(tournamentId: string): Promise<string> {
-    if (!tournamentId) return 'Unknown Tournament';
-    if (this.tournamentCache[tournamentId]) return this.tournamentCache[tournamentId];
-
-    try {
-      const docRef = doc(db, 'tournaments', tournamentId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const name = snap.data()?.name || 'Unknown Tournament';
-        this.tournamentCache[tournamentId] = name;
-        return name;
+  private static mapToHomeMatch(m: any, isUpcoming = false): HomeMatch {
+    const clientMatch = FootballDataService.mapRestMatchToClientMatch(m);
+    let displayKickoff = clientMatch.kickoff;
+    if (isUpcoming && clientMatch.date) {
+      const parts = clientMatch.date.split('-');
+      if (parts.length === 3) {
+        displayKickoff = `${parts[2]}-${parts[1]}, ${clientMatch.kickoff}`;
       }
-    } catch (error) {
-      console.error(`Error resolving tournament name for ID ${tournamentId}:`, error);
     }
-    
-    return 'Unknown Tournament';
-  }
-
-  /**
-   * Resolves a team name from a teamId.
-   */
-  private static async resolveTeamName(teamId: string): Promise<string> {
-    if (!teamId) return 'Unknown Team';
-    if (this.teamCache[teamId]) return this.teamCache[teamId];
-
-    try {
-      const docRef = doc(db, 'teams', teamId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const name = snap.data()?.name || 'Unknown Team';
-        this.teamCache[teamId] = name;
-        return name;
-      }
-    } catch (error) {
-      console.error(`Error resolving team name for ID ${teamId}:`, error);
-    }
-
-    return 'Unknown Team';
-  }
-
-  /**
-   * Resolves a team's logo/flag URL from a teamId.
-   */
-  private static async resolveTeamLogo(teamId: string): Promise<string> {
-    if (!teamId) return '';
-    if (this.teamLogoCache[teamId]) return this.teamLogoCache[teamId];
-
-    try {
-      const docRef = doc(db, 'teams', teamId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        const logo = data?.flagUrl || data?.logo || '';
-        this.teamLogoCache[teamId] = logo;
-        return logo;
-      }
-    } catch (error) {
-      console.error(`Error resolving team logo for ID ${teamId}:`, error);
-    }
-
-    return '';
+    return {
+      id: clientMatch.id,
+      homeTeam: clientMatch.homeTeamName,
+      awayTeam: clientMatch.awayTeamName,
+      homeLogo: clientMatch.homeTeamLogo,
+      awayLogo: clientMatch.awayTeamLogo,
+      tournament: clientMatch.tournamentName,
+      kickoff: displayKickoff,
+      status: clientMatch.status,
+      isHot: clientMatch.isHot,
+    };
   }
 
   static async getHotMatches(): Promise<HomeMatch[]> {
-    await this.logDbStats();
     try {
-      const matchesRef = collection(db, 'matches');
-      const q = query(matchesRef, where('isHot', '==', true), limit(5));
-      const qSnapshot = await getDocs(q);
+      const liveData = await FootballDataService.getLiveMatches();
+      const live = liveData.matches || [];
       
-      console.log(`[HomeService Debug] [getHotMatches] Raw matches found: ${qSnapshot.size}`);
-      
-      const matchPromises = qSnapshot.docs.map(async doc => {
-        const data = doc.data();
-        console.log(`[HomeService Debug] [getHotMatches] Before mapping:`, JSON.stringify(data));
-        
-        const homeName = await this.resolveTeamName(data.homeTeamId || '');
-        const awayName = await this.resolveTeamName(data.awayTeamId || '');
-        const homeLogo = await this.resolveTeamLogo(data.homeTeamId || '');
-        const awayLogo = await this.resolveTeamLogo(data.awayTeamId || '');
-        const tournamentName = await this.resolveTournamentName(data.tournamentId || '');
-        
-        const mapped = {
-          id: doc.id,
-          homeTeam: homeName,
-          awayTeam: awayName,
-          homeLogo: homeLogo,
-          awayLogo: awayLogo,
-          tournament: tournamentName,
-          kickoff: data.kickoff || '00:00',
-          date: data.date || '',
-          status: data.status || 'Scheduled',
-          isHot: !!data.isHot,
-        } as HomeMatch;
-        
-        console.log(`[HomeService Debug] [getHotMatches] After mapping:`, JSON.stringify(mapped));
-        return mapped;
-      });
+      // Fallback: If no live matches, show the first 5 upcoming matches
+      if (live.length === 0) {
+        console.log("[HomeService] No live matches. Falling back to upcoming matches for Hot matches.");
+        const upcomingData = await FootballDataService.getUpcomingMatches();
+        const upcoming = upcomingData.matches || [];
+        return upcoming.slice(0, 5).map(m => this.mapToHomeMatch(m));
+      }
 
-      return await Promise.all(matchPromises);
+      return live.map(m => this.mapToHomeMatch(m));
     } catch (error) {
       console.error("Error fetching hot matches:", error);
       return [];
@@ -157,40 +59,16 @@ export class HomeService {
       const day = String(today.getDate()).padStart(2, '0');
       const todayStr = `${year}-${month}-${day}`;
 
-      const matchesRef = collection(db, 'matches');
-      const q = query(matchesRef, where('date', '==', todayStr));
-      const qSnapshot = await getDocs(q);
+      const upcomingData = await FootballDataService.getUpcomingMatches();
+      const upcoming = upcomingData.matches || [];
       
-      console.log(`[HomeService Debug] [getTodayMatches] Query Date: ${todayStr}, Raw matches found: ${qSnapshot.size}`);
-      
-      const matchPromises = qSnapshot.docs.map(async doc => {
-        const data = doc.data();
-        console.log(`[HomeService Debug] [getTodayMatches] Before mapping:`, JSON.stringify(data));
-
-        const homeName = await this.resolveTeamName(data.homeTeamId || '');
-        const awayName = await this.resolveTeamName(data.awayTeamId || '');
-        const homeLogo = await this.resolveTeamLogo(data.homeTeamId || '');
-        const awayLogo = await this.resolveTeamLogo(data.awayTeamId || '');
-        const tournamentName = await this.resolveTournamentName(data.tournamentId || '');
-        
-        const mapped = {
-          id: doc.id,
-          homeTeam: homeName,
-          awayTeam: awayName,
-          homeLogo: homeLogo,
-          awayLogo: awayLogo,
-          tournament: tournamentName,
-          kickoff: data.kickoff || '00:00',
-          date: data.date || '',
-          status: data.status || 'Scheduled',
-          isHot: !!data.isHot,
-        } as HomeMatch;
-
-        console.log(`[HomeService Debug] [getTodayMatches] After mapping:`, JSON.stringify(mapped));
-        return mapped;
+      // Filter matches happening today
+      const todayMatches = upcoming.filter(m => {
+        const mDate = m.match_date ? m.match_date.split(' ')[0] : '';
+        return mDate === todayStr;
       });
 
-      return await Promise.all(matchPromises);
+      return todayMatches.map(m => this.mapToHomeMatch(m));
     } catch (error) {
       console.error("Error fetching today matches:", error);
       return [];
@@ -199,55 +77,9 @@ export class HomeService {
 
   static async getUpcomingMatches(): Promise<HomeMatch[]> {
     try {
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const day = String(today.getDate()).padStart(2, '0');
-      const todayStr = `${year}-${month}-${day}`;
-
-      const matchesRef = collection(db, 'matches');
-      const q = query(matchesRef, where('date', '>', todayStr), orderBy('date'), limit(5));
-      const qSnapshot = await getDocs(q);
-      
-      console.log(`[HomeService Debug] [getUpcomingMatches] Query Date > ${todayStr}, Raw matches found: ${qSnapshot.size}`);
-      
-      const matchPromises = qSnapshot.docs.map(async doc => {
-        const data = doc.data();
-        console.log(`[HomeService Debug] [getUpcomingMatches] Before mapping:`, JSON.stringify(data));
-
-        const homeName = await this.resolveTeamName(data.homeTeamId || '');
-        const awayName = await this.resolveTeamName(data.awayTeamId || '');
-        const homeLogo = await this.resolveTeamLogo(data.homeTeamId || '');
-        const awayLogo = await this.resolveTeamLogo(data.awayTeamId || '');
-        const tournamentName = await this.resolveTournamentName(data.tournamentId || '');
-        
-        // Format display kickoff: YYYY-MM-DD -> DD-MM
-        let displayKickoff = data.kickoff || '00:00';
-        if (data.date) {
-          const parts = data.date.split('-');
-          if (parts.length === 3) {
-            displayKickoff = `${parts[2]}-${parts[1]}, ${data.kickoff || '00:00'}`;
-          }
-        }
-
-        const mapped = {
-          id: doc.id,
-          homeTeam: homeName,
-          awayTeam: awayName,
-          homeLogo: homeLogo,
-          awayLogo: awayLogo,
-          tournament: tournamentName,
-          kickoff: displayKickoff,
-          date: data.date || '',
-          status: data.status || 'Scheduled',
-          isHot: !!data.isHot,
-        } as HomeMatch;
-
-        console.log(`[HomeService Debug] [getUpcomingMatches] After mapping:`, JSON.stringify(mapped));
-        return mapped;
-      });
-
-      return await Promise.all(matchPromises);
+      const upcomingData = await FootballDataService.getUpcomingMatches();
+      const upcoming = upcomingData.matches || [];
+      return upcoming.slice(0, 5).map(m => this.mapToHomeMatch(m, true));
     } catch (error) {
       console.error("Error fetching upcoming matches:", error);
       return [];
@@ -258,7 +90,6 @@ export class HomeService {
     try {
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        console.log("[HomeService Debug] [getFavoritePlayers] No authenticated user.");
         return [];
       }
 
@@ -269,7 +100,6 @@ export class HomeService {
           uid: currentUser.uid,
           displayName: currentUser.displayName || 'Champ',
           email: currentUser.email || '',
-          coinBalance: 1250,
           favoritePlayers: ['player_sdb_lionel_messi', 'player_sdb_cristiano_ronaldo', 'player_sdb_erling_haaland'],
           createdAt: new Date().toISOString()
         };
@@ -286,50 +116,57 @@ export class HomeService {
       }
 
       const favoriteIds = userSnap.data()?.favoritePlayers || [];
-      console.log(`[HomeService Debug] [getFavoritePlayers] User favorite IDs:`, favoriteIds);
       if (favoriteIds.length === 0) {
         return [];
       }
 
-      const playerPromises = favoriteIds.map(async (playerId: string) => {
-        const playerSnap = await getDoc(doc(db, 'players', playerId));
-        if (playerSnap.exists()) {
-          const pData = playerSnap.data();
-          
-          // Resolve next match details
+      // Fetch upcoming matches once to resolve next fixture for all favorite players
+      let upcomingMatches: any[] = [];
+      try {
+        const upcomingData = await FootballDataService.getUpcomingMatches();
+        upcomingMatches = upcomingData.matches || [];
+      } catch (err) {
+        console.error("Error fetching upcoming matches for player resolution:", err);
+      }
+
+      const resolved = favoriteIds.map((playerId: string) => {
+        // Find player details in local playersData
+        const pData = (playersData as any[]).find(
+          (p) => String(p.idPlayer) === playerId || p.id === playerId
+        );
+
+        if (pData) {
           let nextMatchStr = 'Chưa có lịch thi đấu';
-          if (pData.nextMatchId) {
-            const matchSnap = await getDoc(doc(db, 'matches', pData.nextMatchId));
-            if (matchSnap.exists()) {
-              const mData = matchSnap.data();
-              
-              // Format date: YYYY-MM-DD -> DD-MM
+          const playerTeam = pData.strTeam;
+          if (playerTeam) {
+            const nextMatch = upcomingMatches.find(
+              (m) =>
+                m.home_team?.team_name === playerTeam ||
+                m.away_team?.team_name === playerTeam
+            );
+            if (nextMatch) {
+              const clientM = FootballDataService.mapRestMatchToClientMatch(nextMatch);
               let dateStr = '';
-              if (mData.date) {
-                const parts = mData.date.split('-');
+              if (clientM.date) {
+                const parts = clientM.date.split('-');
                 if (parts.length === 3) dateStr = ` (${parts[2]}-${parts[1]})`;
               }
-              const homeName = await this.resolveTeamName(mData.homeTeamId || '');
-              const awayName = await this.resolveTeamName(mData.awayTeamId || '');
-              nextMatchStr = `${homeName} vs ${awayName}${dateStr}`;
+              nextMatchStr = `${clientM.homeTeamName} vs ${clientM.awayTeamName}${dateStr}`;
             }
           }
 
           return {
-            id: playerSnap.id,
-            name: pData.name || '',
-            avatar: pData.image || '',
+            id: playerId,
+            name: pData.strPlayer || '',
+            avatar: pData.strRender || pData.strCutout || pData.strThumb || '',
             nextMatch: nextMatchStr,
-            position: pData.position || 'Forward',
+            position: pData.strPosition || 'Forward',
           } as HomePlayer;
         }
         return null;
       });
 
-      const resolved = await Promise.all(playerPromises);
-      const filtered = resolved.filter((p): p is HomePlayer => p !== null);
-      console.log(`[HomeService Debug] [getFavoritePlayers] Mapped players:`, filtered.length);
-      return filtered;
+      return resolved.filter((p: any): p is HomePlayer => p !== null);
     } catch (error) {
       console.error("Error fetching favorite players:", error);
       return [];
@@ -338,29 +175,19 @@ export class HomeService {
 
   static async getAIRecommendation(): Promise<AIRecommendation | null> {
     try {
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const day = String(today.getDate()).padStart(2, '0');
-      const todayStr = `${year}-${month}-${day}`;
-
-      const matchesRef = collection(db, 'matches');
-      // Fetch the next match starting from today
-      const q = query(matchesRef, where('date', '>=', todayStr), orderBy('date'), limit(1));
-      const qSnapshot = await getDocs(q);
-
-      if (qSnapshot.empty) {
-        console.log("[HomeService Debug] [getAIRecommendation] No upcoming matches found to generate recommendation.");
+      const upcomingData = await FootballDataService.getUpcomingMatches();
+      const upcoming = upcomingData.matches || [];
+      if (upcoming.length === 0) {
         return null;
       }
 
-      const matchDoc = qSnapshot.docs[0];
-      const mData = matchDoc.data();
-      const homeName = await this.resolveTeamName(mData.homeTeamId || '');
-      const awayName = await this.resolveTeamName(mData.awayTeamId || '');
+      const match = upcoming[0];
+      const clientMatch = FootballDataService.mapRestMatchToClientMatch(match);
+      const homeName = clientMatch.homeTeamName;
+      const awayName = clientMatch.awayTeamName;
 
       return {
-        id: matchDoc.id,
+        id: clientMatch.id,
         homeTeam: homeName,
         awayTeam: awayName,
         reason: `Trận đấu tâm điểm giữa ${homeName} và ${awayName} được AI dự đoán vô cùng kịch tính. Dựa trên phong độ 5 trận gần nhất và sơ đồ chiến thuật mới nhất, khả năng chiến thắng chia đều cho cả hai đội.`,

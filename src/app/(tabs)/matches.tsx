@@ -22,26 +22,15 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useMatches } from '@/hooks/useMatches';
 import { ClientMatch } from '@/types/match.types';
+import { FootballDataService } from '@/services/footballData.service';
 
 const { width } = Dimensions.get('window');
-const COINS_CACHE_KEY = 'user_coins';
 
-interface MatchWithOdds extends ClientMatch {
-  odds: {
-    teamA: { label: string; value: number };
-    draw: { label: string; value: number };
-    teamB: { label: string; value: number };
-  };
-  aiPrediction: string;
-}
-
-const CATEGORIES = [
-  { id: 'all', label: 'Tất cả', leagueKey: '' },
-  { id: 't_wc_2026', label: 'WC 2026', leagueKey: 'WORLD CUP' },
-  { id: 't_ucl', label: 'Champion League', leagueKey: 'CHAMPIONS LEAGUE' },
-  { id: 't_uel', label: 'Europa league', leagueKey: 'EUROPA LEAGUE' },
-  { id: 't_bundesliga', label: 'Bulestiga', leagueKey: 'BULESTIGA' },
-  { id: 't_epl', label: 'Premier League', leagueKey: 'PREMIER LEAGUE' }
+const STATUS_FILTERS = [
+  { id: 'all', label: 'Tất cả' },
+  { id: 'Upcoming', label: 'Sắp diễn ra' },
+  { id: 'Live', label: 'Trực tiếp' },
+  { id: 'Finished', label: 'Đã kết thúc' }
 ];
 
 export default function MatchesScreen() {
@@ -52,150 +41,48 @@ export default function MatchesScreen() {
   // Tab State: fixtures vs bracket
   const [activeTab, setActiveTab] = useState<'fixtures' | 'bracket'>('fixtures');
   
-  // Category state
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  // Dynamic leagues state
+  const [leagues, setLeagues] = useState<any[]>([]);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | number>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'Upcoming' | 'Live' | 'Finished'>('all');
 
-  // Coin state
-  const [coins, setCoins] = useState<number>(1250);
-
-  // Firestore Hook
-  const { allMatches, groupedMatches, loading, refreshing, refresh, hasMore, loadMore } = useMatches();
-
-  // Betting modal state
-  const [betModalVisible, setBetModalVisible] = useState<boolean>(false);
-  const [selectedMatch, setSelectedMatch] = useState<MatchWithOdds | null>(null);
-  const [selectedOutcome, setSelectedOutcome] = useState<'teamA' | 'draw' | 'teamB' | null>(null);
-  const [betAmount, setBetAmount] = useState<string>('100');
-  
-  // Success state
-  const [showSuccess, setShowSuccess] = useState<boolean>(false);
-  const [successDetails, setSuccessDetails] = useState<{
-    outcomeLabel: string;
-    amount: number;
-    winAmount: number;
-  } | null>(null);
-
-  // Load coins from cache
+  // Fetch leagues on mount
   useEffect(() => {
-    const loadCoins = async () => {
+    async function loadLeagues() {
       try {
-        const cachedCoins = await AsyncStorage.getItem(COINS_CACHE_KEY);
-        if (cachedCoins !== null) {
-          setCoins(parseInt(cachedCoins, 10));
-        } else {
-          await AsyncStorage.setItem(COINS_CACHE_KEY, '1250');
-        }
-      } catch (error) {
-        console.error('Lỗi khi đọc số dư coin:', error);
+        const data = await FootballDataService.getLeagues();
+        setLeagues(data || []);
+      } catch (err) {
+        console.error("Error loading leagues:", err);
       }
-    };
-    loadCoins();
+    }
+    loadLeagues();
   }, []);
 
-  // Save coins cache helper
-  const saveCoins = async (amount: number) => {
-    try {
-      setCoins(amount);
-      await AsyncStorage.setItem(COINS_CACHE_KEY, amount.toString());
-    } catch (error) {
-      console.error('Lỗi khi lưu số dư coin:', error);
-    }
-  };
+  // Hook query parameters are computed dynamically based on the active tab
+  const { allMatches, groupedMatches, loading, refreshing, refresh } = useMatches(
+    activeTab === 'bracket' ? '50' : selectedLeagueId,
+    activeTab === 'bracket' ? 'all' : statusFilter
+  );
 
-  // Claim free coins for testing and fun
-  const claimFreeCoins = () => {
-    const newBalance = coins + 500;
-    saveCoins(newBalance);
-    if (Platform.OS === 'web') {
-      window.alert('Bạn đã nhận thành công +500 Coins miễn phí! 🎉');
-    } else {
-      Alert.alert('Nhận Quà Hàng Ngày', 'Bạn đã nhận thành công +500 Coins miễn phí! 🎉');
-    }
-  };
-
-  // Deterministically generate odds and predictions based on match ID
-  const getOddsAndPrediction = (match: ClientMatch): MatchWithOdds => {
+  const getAiPrediction = (match: ClientMatch): string => {
     const charCodeSum = match.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
     const oddsA = 1.5 + (charCodeSum % 100) / 100 * 2.0;
     const oddsB = 1.5 + ((charCodeSum + 42) % 100) / 100 * 3.5;
-    const oddsDraw = 2.5 + ((charCodeSum + 84) % 100) / 100 * 1.5;
-
-    return {
-      ...match,
-      odds: {
-        teamA: { label: `${match.homeTeamName} thắng`, value: parseFloat(oddsA.toFixed(2)) },
-        draw: { label: 'Hòa', value: parseFloat(oddsDraw.toFixed(2)) },
-        teamB: { label: `${match.awayTeamName} thắng`, value: parseFloat(oddsB.toFixed(2)) }
-      },
-      aiPrediction: `${Math.round(60 + (charCodeSum % 30))}% AI dự đoán: ${
-        oddsA < oddsB ? `${match.homeTeamName} thắng` : `${match.awayTeamName} thắng`
-      }`
-    };
+    return `${Math.round(60 + (charCodeSum % 30))}% AI dự đoán: ${
+      oddsA < oddsB ? `${match.homeTeamName} thắng` : `${match.awayTeamName} thắng`
+    }`;
   };
 
-  const handleOpenBet = (match: ClientMatch, outcome: 'teamA' | 'draw' | 'teamB') => {
-    const matchWithOdds = getOddsAndPrediction(match);
-    setSelectedMatch(matchWithOdds);
-    setSelectedOutcome(outcome);
-    setBetAmount('100');
-    setShowSuccess(false);
-    setBetModalVisible(true);
-  };
-
-  const handlePlaceBet = () => {
-    if (!selectedMatch || !selectedOutcome) return;
-
-    const amount = parseInt(betAmount, 10);
-    if (isNaN(amount) || amount <= 0) {
-      if (Platform.OS === 'web') {
-        window.alert('Vui lòng nhập số coin cược hợp lệ.');
-      } else {
-        Alert.alert('Lỗi', 'Vui lòng nhập số coin cược hợp lệ.');
-      }
-      return;
-    }
-
-    if (amount > coins) {
-      if (Platform.OS === 'web') {
-        window.alert('Số dư tài khoản không đủ để đặt cược.');
-      } else {
-        Alert.alert('Lỗi', 'Số dư tài khoản không đủ để đặt cược.');
-      }
-      return;
-    }
-
-    const oddsObj = selectedMatch.odds[selectedOutcome];
-    const winAmount = Math.round(amount * oddsObj.value);
-    
-    const newBalance = coins - amount;
-    saveCoins(newBalance);
-
-    setSuccessDetails({
-      outcomeLabel: oddsObj.label,
-      amount,
-      winAmount
-    });
-    setShowSuccess(true);
-  };
-
-  const selectedOdds = selectedMatch && selectedOutcome ? selectedMatch.odds[selectedOutcome] : null;
-  const calculatedWin = selectedOdds ? Math.round((parseInt(betAmount, 10) || 0) * selectedOdds.value) : 0;
-
-  // Filter grouped matches by category
-  const filteredGroupedMatches = groupedMatches.filter(group => {
-    if (selectedCategory === 'all') return true;
-    const cat = CATEGORIES.find(c => c.id === selectedCategory);
-    if (!cat) return true;
-    return group.tournamentName.toUpperCase().includes(cat.leagueKey);
-  });
+  const filteredGroupedMatches = groupedMatches;
 
   // Render Bracket Screen View
   const renderBracket = () => {
-    const wcMatches = allMatches.filter(m => m.tournamentId === 't_wc_2026');
+    const wcMatches = allMatches.filter(m => m.tournamentId === '50');
 
     // Extract matches grouped by stage
     const getStageMatches = (stageName: string, count: number): (ClientMatch | null)[] => {
-      const filtered = wcMatches.filter(m => m.stage.toLowerCase() === stageName.toLowerCase());
+      const filtered = wcMatches.filter(m => m.stage && String(m.stage).toLowerCase() === stageName.toLowerCase());
       const res: (ClientMatch | null)[] = [...filtered];
       while (res.length < count) {
         res.push(null); // Placeholders
@@ -225,7 +112,7 @@ export default function MatchesScreen() {
         <TouchableOpacity
           key={match.id}
           style={[styles.bracketCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => router.push(`/match/${match.id}` as any)}
+          onPress={() => router.push({ pathname: '/match/[id]', params: { id: match.id, leagueId: match.tournamentId } })}
         >
           {/* Home team */}
           <View style={styles.bracketTeamRow}>
@@ -324,7 +211,7 @@ export default function MatchesScreen() {
         {/* Header Title */}
         <View style={styles.header}>
           <ThemedText type="title">Lịch Đấu & Dự Đoán</ThemedText>
-          <ThemedText style={{ color: '#A0AEC0', marginTop: 4 }}>Cá cược bằng Coin ảo trực tiếp từ danh sách trận đấu</ThemedText>
+          <ThemedText style={{ color: '#A0AEC0', marginTop: 4 }}>Xem lịch thi đấu và thông tin chi tiết các trận đấu</ThemedText>
         </View>
 
         {/* Segmented Button (Fixtures vs Bracket) */}
@@ -343,40 +230,21 @@ export default function MatchesScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Coin Balance Bar */}
-        <View style={[styles.balanceBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View>
-            <ThemedText style={styles.balanceTitle}>SỐ DƯ CỦA BẠN</ThemedText>
-            <View style={styles.coinWrapper}>
-              <Ionicons size={22} name="cash-outline" color={colors.gold} />
-              <ThemedText style={[styles.coinText, { color: colors.gold }]}>
-                {coins.toLocaleString()} COINS
-              </ThemedText>
-            </View>
-          </View>
-          <TouchableOpacity 
-            style={[styles.claimBtn, { backgroundColor: colors.success + '20', borderColor: colors.success }]}
-            onPress={claimFreeCoins}
-          >
-            <ThemedText style={[styles.claimBtnText, { color: colors.success }]}>Nhận +500</ThemedText>
-          </TouchableOpacity>
-        </View>
-
         {/* If Active Tab is Fixtures, render grouped list */}
         {activeTab === 'fixtures' ? (
           <View>
-            {/* Category Tabs */}
+            {/* Status Filter Tabs */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.categoriesContainer}
               contentContainerStyle={styles.categoriesContent}
             >
-              {CATEGORIES.map((cat) => {
-                const isActive = selectedCategory === cat.id;
+              {STATUS_FILTERS.map((filter) => {
+                const isActive = statusFilter === filter.id;
                 return (
                   <TouchableOpacity
-                    key={cat.id}
+                    key={filter.id}
                     style={[
                       styles.categoryTab,
                       {
@@ -384,7 +252,7 @@ export default function MatchesScreen() {
                         borderColor: isActive ? colors.primary : colors.border,
                       }
                     ]}
-                    onPress={() => setSelectedCategory(cat.id)}
+                    onPress={() => setStatusFilter(filter.id as any)}
                   >
                     <ThemedText
                       style={[
@@ -392,12 +260,65 @@ export default function MatchesScreen() {
                         isActive && { color: '#FFFFFF', fontWeight: 'bold' }
                       ]}
                     >
-                      {cat.label}
+                      {filter.label}
                     </ThemedText>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
+
+            {/* League Selector (Dynamic) */}
+            <View style={styles.leagueSelectorWrapper}>
+              <ThemedText style={styles.filterSectionTitle}>Giải đấu</ThemedText>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.leaguesContainer}
+                contentContainerStyle={styles.leaguesContent}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.leagueTab,
+                    {
+                      backgroundColor: selectedLeagueId === 'all' ? colors.primary : colors.card,
+                      borderColor: selectedLeagueId === 'all' ? colors.primary : colors.border,
+                    }
+                  ]}
+                  onPress={() => setSelectedLeagueId('all')}
+                >
+                  <ThemedText style={[styles.leagueTextTab, selectedLeagueId === 'all' && { color: '#FFFFFF', fontWeight: 'bold' }]}>Tất cả các giải</ThemedText>
+                </TouchableOpacity>
+
+                {leagues.map((league) => {
+                  const isActive = selectedLeagueId === league.league_id;
+                  return (
+                    <TouchableOpacity
+                      key={league.league_id}
+                      style={[
+                        styles.leagueTab,
+                        {
+                          backgroundColor: isActive ? colors.primary : colors.card,
+                          borderColor: isActive ? colors.primary : colors.border,
+                        }
+                      ]}
+                      onPress={() => setSelectedLeagueId(league.league_id)}
+                    >
+                      {league.league_image && (
+                        <Image source={{ uri: league.league_image }} style={styles.leagueIcon} />
+                      )}
+                      <ThemedText
+                        style={[
+                          styles.leagueTextTab,
+                          isActive && { color: '#FFFFFF', fontWeight: 'bold' }
+                        ]}
+                      >
+                        {league.league_name}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
 
             {loading ? (
               <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
@@ -416,7 +337,6 @@ export default function MatchesScreen() {
                   </View>
 
                   {group.matches.map((match) => {
-                    const matchWithOdds = getOddsAndPrediction(match);
                     const isLive = match.status.toLowerCase().includes('live');
                     const isFT = match.status === 'FT';
 
@@ -425,7 +345,7 @@ export default function MatchesScreen() {
                         {/* Match Detail Trigger Wrap */}
                         <TouchableOpacity
                           activeOpacity={0.9}
-                          onPress={() => router.push(`/match/${match.id}` as any)}
+                          onPress={() => router.push({ pathname: '/match/[id]', params: { id: match.id, leagueId: match.tournamentId } })}
                         >
                           {/* Card Header */}
                           <View style={styles.cardHeader}>
@@ -481,38 +401,10 @@ export default function MatchesScreen() {
                           <View style={[styles.aiBadge, { backgroundColor: colors.primary + '15' }]}>
                             <Ionicons size={14} name="sparkles" color={colors.primary} />
                             <ThemedText style={[styles.aiText, { color: colors.primary }]} numberOfLines={1}>
-                              {matchWithOdds.aiPrediction}
+                              {getAiPrediction(match)}
                             </ThemedText>
                           </View>
                         </TouchableOpacity>
-
-                        {/* Odds / Betting Options */}
-                        <View style={styles.oddsSection}>
-                          <ThemedText style={styles.oddsTitle}>Đặt cược ảo bằng xu (Thắng - Hòa - Thua)</ThemedText>
-                          <View style={styles.oddsContainer}>
-                            <TouchableOpacity 
-                              style={[styles.oddsBtn, { borderColor: colors.border }]} 
-                              onPress={() => handleOpenBet(match, 'teamA')}
-                            >
-                              <ThemedText style={styles.oddsLabel} numberOfLines={1}>1 ({match.homeTeamName})</ThemedText>
-                              <ThemedText style={[styles.oddsValue, { color: colors.primary }]}>{matchWithOdds.odds.teamA.value.toFixed(2)}</ThemedText>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                              style={[styles.oddsBtn, { borderColor: colors.border }]} 
-                              onPress={() => handleOpenBet(match, 'draw')}
-                            >
-                              <ThemedText style={styles.oddsLabel}>Hòa (X)</ThemedText>
-                              <ThemedText style={[styles.oddsValue, { color: colors.primary }]}>{matchWithOdds.odds.draw.value.toFixed(2)}</ThemedText>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                              style={[styles.oddsBtn, { borderColor: colors.border }]} 
-                              onPress={() => handleOpenBet(match, 'teamB')}
-                            >
-                              <ThemedText style={styles.oddsLabel} numberOfLines={1}>2 ({match.awayTeamName})</ThemedText>
-                              <ThemedText style={[styles.oddsValue, { color: colors.primary }]}>{matchWithOdds.odds.teamB.value.toFixed(2)}</ThemedText>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
                       </View>
                     );
                   })}
@@ -520,14 +412,6 @@ export default function MatchesScreen() {
               ))
             )}
 
-            {hasMore && (
-              <TouchableOpacity
-                style={[styles.loadMoreBtn, { borderColor: colors.primary }]}
-                onPress={loadMore}
-              >
-                <ThemedText style={[styles.loadMoreBtnText, { color: colors.primary }]}>Xem thêm trận đấu</ThemedText>
-              </TouchableOpacity>
-            )}
           </View>
         ) : (
           /* Render Tournament Bracket View */
@@ -540,146 +424,7 @@ export default function MatchesScreen() {
 
       </ScrollView>
 
-      {/* Betting Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={betModalVisible}
-        onRequestClose={() => setBetModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            
-            {!showSuccess ? (
-              <View>
-                <View style={styles.modalHeader}>
-                  <ThemedText type="subtitle" style={styles.modalTitle}>Phiếu Đặt Cược ⚽</ThemedText>
-                  <TouchableOpacity style={styles.closeBtn} onPress={() => setBetModalVisible(false)}>
-                    <ThemedText style={{ color: '#A0AEC0', fontSize: 20 }}>×</ThemedText>
-                  </TouchableOpacity>
-                </View>
-
-                {selectedMatch && selectedOutcome && selectedOdds && (
-                  <View style={styles.modalContent}>
-                    <ThemedText style={styles.modalMatchName}>
-                      {selectedMatch.homeTeamName} vs {selectedMatch.awayTeamName}
-                    </ThemedText>
-                    <View style={[styles.selectionBadge, { backgroundColor: colors.primary + '15' }]}>
-                      <ThemedText style={{ color: colors.primary, fontWeight: 'bold' }}>
-                        Cược chọn: {selectedOdds.label} (Tỷ lệ: {selectedOdds.value.toFixed(2)})
-                      </ThemedText>
-                    </View>
-
-                    <View style={styles.balanceInfo}>
-                      <ThemedText style={{ color: '#A0AEC0' }}>Số dư hiện tại:</ThemedText>
-                      <ThemedText style={{ fontWeight: 'bold', color: colors.gold }}>
-                        {coins.toLocaleString()} Coins
-                      </ThemedText>
-                    </View>
-
-                    <ThemedText style={styles.inputTitle}>Nhập số Coin đặt cược:</ThemedText>
-                    <TextInput
-                      style={[styles.textInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                      keyboardType="numeric"
-                      value={betAmount}
-                      onChangeText={setBetAmount}
-                      placeholder="Nhập số coin cược"
-                      placeholderTextColor="#718096"
-                    />
-
-                    {/* Quick Select Buttons */}
-                    <View style={styles.quickSelectContainer}>
-                      {['50', '100', '200', '500'].map((amt) => (
-                        <TouchableOpacity
-                          key={amt}
-                          style={[
-                            styles.quickBtn, 
-                            { borderColor: colors.border },
-                            betAmount === amt && { backgroundColor: colors.primary, borderColor: colors.primary }
-                          ]}
-                          onPress={() => setBetAmount(amt)}
-                        >
-                          <ThemedText style={[
-                            styles.quickBtnText,
-                            betAmount === amt && { color: '#FFFFFF', fontWeight: 'bold' }
-                          ]}>
-                            {amt}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      ))}
-                      <TouchableOpacity
-                        style={[
-                          styles.quickBtn, 
-                          { borderColor: colors.border },
-                          betAmount === coins.toString() && { backgroundColor: colors.primary, borderColor: colors.primary }
-                        ]}
-                        onPress={() => setBetAmount(coins.toString())}
-                      >
-                        <ThemedText style={[
-                          styles.quickBtnText,
-                          betAmount === coins.toString() && { color: '#FFFFFF', fontWeight: 'bold' }
-                        ]}>
-                          Tất cả
-                        </ThemedText>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Estimated Win Bar */}
-                    <View style={styles.estWinContainer}>
-                      <ThemedText style={{ color: '#A0AEC0' }}>Thắng dự kiến:</ThemedText>
-                      <ThemedText style={{ fontWeight: 'bold', color: colors.success, fontSize: 16 }}>
-                        {calculatedWin.toLocaleString()} Coins
-                      </ThemedText>
-                    </View>
-
-                    {/* Submit Button */}
-                    <TouchableOpacity
-                      style={[styles.submitBtn, { backgroundColor: colors.primary }]}
-                      onPress={handlePlaceBet}
-                    >
-                      <ThemedText style={styles.submitBtnText}>Xác nhận Đặt cược</ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            ) : (
-              <View style={styles.successContainer}>
-                <View style={[styles.successIconWrapper, { backgroundColor: colors.success + '20' }]}>
-                  <ThemedText style={{ fontSize: 40 }}>🎉</ThemedText>
-                </View>
-                
-                <ThemedText type="subtitle" style={styles.successTitle}>Đặt Cược Thành Công!</ThemedText>
-                
-                {successDetails && (
-                  <View style={styles.successDetailsCard}>
-                    <ThemedText style={styles.successDetailText}>
-                      Lựa chọn: <ThemedText style={{ fontWeight: 'bold' }}>{successDetails.outcomeLabel}</ThemedText>
-                    </ThemedText>
-                    <ThemedText style={styles.successDetailText}>
-                      Tiền cược: <ThemedText style={{ color: colors.gold, fontWeight: 'bold' }}>{successDetails.amount.toLocaleString()} Coins</ThemedText>
-                    </ThemedText>
-                    <ThemedText style={styles.successDetailText}>
-                      Thắng dự kiến: <ThemedText style={{ color: colors.success, fontWeight: 'bold' }}>{successDetails.winAmount.toLocaleString()} Coins</ThemedText>
-                    </ThemedText>
-                  </View>
-                )}
-
-                <ThemedText style={styles.successMessage}>
-                  Số dư của bạn đã được cập nhật. Kết quả cược sẽ tự động được thanh toán khi trận đấu kết thúc!
-                </ThemedText>
-
-                <TouchableOpacity
-                  style={[styles.closeSuccessBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => setBetModalVisible(false)}
-                >
-                  <ThemedText style={styles.closeSuccessBtnText}>Đóng</ThemedText>
-                </TouchableOpacity>
-              </View>
-            )}
-
-          </View>
-        </View>
-      </Modal>
+      {/* Betting Modal Removed */}
     </ThemedView>
   );
 }
@@ -1205,5 +950,40 @@ const styles = StyleSheet.create({
   loadMoreBtnText: {
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  leagueSelectorWrapper: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  filterSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#A0AEC0',
+    marginBottom: 8,
+  },
+  leaguesContainer: {
+    flexDirection: 'row',
+  },
+  leaguesContent: {
+    paddingRight: 24,
+    gap: 8,
+  },
+  leagueTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 6,
+  },
+  leagueTextTab: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  leagueIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
   },
 });

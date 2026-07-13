@@ -53,7 +53,7 @@ export default function AIRecommendationCard({ recommendation }: Props) {
             style={[styles.actionBtn, { backgroundColor: colors.primary }]}
             onPress={() => router.push('/(tabs)/matches')}
           >
-            <ThemedText style={styles.actionBtnText}>Đặt cược trận này</ThemedText>
+            <ThemedText style={styles.actionBtnText}>Xem trận đấu</ThemedText>
             <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
           </TouchableOpacity>
         </View>

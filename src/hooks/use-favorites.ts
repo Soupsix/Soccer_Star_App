@@ -20,28 +20,40 @@ export function useFavorites() {
   const [loading,   setLoading]   = useState(true);
 
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    let unsubscribeSnapshot: (() => void) | null = null;
 
-    const ref = doc(db, 'users', user.uid);
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
+      }
 
-    // onSnapshot — fires immediately with current data AND on every future change.
-    // This means: toggle on Players screen → Profile screen updates automatically.
-    const unsubscribe = onSnapshot(
-      ref,
-      (snap) => {
-        setFavorites(snap.exists() ? (snap.data()?.favoritePlayers as string[]) ?? [] : []);
+      if (!user) {
+        setFavorites([]);
         setLoading(false);
-      },
-      (_err) => {
-        setLoading(false);
-      },
-    );
+        return;
+      }
 
-    return () => unsubscribe();   // cleanup when component unmounts
+      const ref = doc(db, 'users', user.uid);
+
+      unsubscribeSnapshot = onSnapshot(
+        ref,
+        (snap) => {
+          setFavorites(snap.exists() ? (snap.data()?.favoritePlayers as string[]) ?? [] : []);
+          setLoading(false);
+        },
+        (_err) => {
+          setLoading(false);
+        },
+      );
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+    };
   }, []);
 
   const isFavorite = useCallback(

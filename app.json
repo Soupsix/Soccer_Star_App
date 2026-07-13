@@ -19,12 +19,14 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#10233A"
-      }
+      },
+      "package": "com.soupsiz.soccerstarapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/withAndroidCMakeStagingDir.js",
       "expo-router",
       [
         "expo-splash-screen",
@@ -36,6 +38,22 @@
           "dark": {
             "backgroundColor": "#10233A"
           }
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "SoccerWidget",
+              "label": "Soccer Star Widget",
+              "minWidth": "160dp",
+              "minHeight": "110dp",
+              "description": "Widget Locket & Live Score",
+              "previewImage": "./assets/icon.png",
+              "updatePeriodMillis": 900000
+            }
+          ]
         }
       ]
     ],
