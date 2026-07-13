@@ -206,7 +206,7 @@ export default function MatchDetailScreen() {
                       <View style={[styles.timelineDotBg, { backgroundColor: colors.background }]}>
                         <Ionicons name={iconName} size={12} color={iconColor} />
                       </View>
-                      <ThemedText style={styles.eventMinute}>{event.minute}'</ThemedText>
+                      <ThemedText style={styles.eventMinute}>{`${event.minute}'`}</ThemedText>
                     </View>
 
                     {/* Right event (Away Team side) */}
