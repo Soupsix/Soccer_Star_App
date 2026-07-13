@@ -1,7 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { auth } from '@/services/firebase';
@@ -13,28 +12,7 @@ export default function Header() {
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
   const user = auth.currentUser;
-
-  const [coins, setCoins] = useState<number>(1250);
-
-  // Sync coins with AsyncStorage whenever screen is focused
-  useFocusEffect(
-    useCallback(() => {
-      const loadCoins = async () => {
-        try {
-          const cachedCoins = await AsyncStorage.getItem('user_coins');
-          if (cachedCoins !== null) {
-            setCoins(parseInt(cachedCoins, 10));
-          } else {
-            await AsyncStorage.setItem('user_coins', '1250');
-            setCoins(1250);
-          }
-        } catch (error) {
-          console.error('Error reading coins in Home Header:', error);
-        }
-      };
-      loadCoins();
-    }, [])
-  );
+  const router = useRouter();
 
   return (
     <View style={styles.header}>
@@ -45,16 +23,18 @@ export default function Header() {
         </ThemedText>
       </View>
       <View style={styles.rightActions}>
-        {/* Wallet Badge */}
-        <View style={[styles.walletBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Ionicons name="logo-usd" size={16} color={colors.gold} />
-          <ThemedText style={[styles.walletText, { color: colors.gold }]}>
-            {coins.toLocaleString()}
-          </ThemedText>
-        </View>
-
+        {/* Search Icon */}
+        <TouchableOpacity
+          style={[styles.notiBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => router.push('/search' as any)}
+        >
+          <Ionicons name="search-outline" size={20} color={colors.text} />
+        </TouchableOpacity>
         {/* Notification Icon */}
-        <TouchableOpacity style={[styles.notiBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <TouchableOpacity 
+          style={[styles.notiBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => router.push('/notifications' as any)}
+        >
           <Ionicons name="notifications-outline" size={20} color={colors.text} />
           <View style={styles.badgeDot} />
         </TouchableOpacity>
@@ -83,6 +63,7 @@ const styles = StyleSheet.create({
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   walletBadge: {
     flexDirection: 'row',

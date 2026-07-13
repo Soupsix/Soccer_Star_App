@@ -20,9 +20,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "News",
+          title: "Home",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="newspaper.fill" color={color} />
+            <IconSymbol size={26} name="house.fill" color={color} />
           ),
         }}
       />
@@ -31,23 +31,23 @@ export default function TabLayout() {
         options={{
           title: "Matches",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="house.fill" color={color} />
+            <IconSymbol size={26} name="sportscourt.fill" color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="players"
         options={{
-          title: "Cầu thủ",
+          title: "Players",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="person.3.fill" color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="discover"
+        name="community"
         options={{
-          title: "Discover",
+          title: "Community",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="paperplane.fill" color={color} />
           ),

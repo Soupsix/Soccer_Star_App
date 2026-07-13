@@ -67,7 +67,6 @@ export default function RegisterScreen() {
         name: values.name,
         email: values.email,
         phone: values.phone,
-        coins: 1250, // default coin balance
         createdAt: new Date().toISOString(),
       });
 

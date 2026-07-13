@@ -9,6 +9,10 @@ import 'react-native-reanimated';
 import { auth } from '@/services/firebase';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { registerWidgetTaskHandler } from 'react-native-android-widget';
+import { widgetTaskHandler } from '@/widgets/widget-task-handler';
+
+registerWidgetTaskHandler(widgetTaskHandler);
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -64,6 +68,11 @@ export default function RootLayout() {
         <Stack.Screen name="auth/register" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="auth/forgot-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="search" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="tournament/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="team/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="match/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="news/article" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen
           name="profile/personal-info"

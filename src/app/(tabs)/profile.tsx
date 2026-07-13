@@ -126,17 +126,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.menuItem, { borderBottomColor: colors.border }]}
-              onPress={() => {}}
-            >
-              <View style={[styles.menuIconWrap, { backgroundColor: colors.primary + '18' }]}>
-                <IconSymbol size={18} name="dollarsign.circle.fill" color={colors.primary} />
-              </View>
-              <ThemedText style={styles.menuText}>Ví Coin & Lịch sử</ThemedText>
-              <IconSymbol size={16} name="chevron.right" color="#A0AEC0" style={{ marginLeft: 'auto' }} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
               style={[styles.menuItem, { borderBottomColor: 'transparent' }]}
               onPress={() => router.push('/profile/personal-info?tab=notifications')}
             >
