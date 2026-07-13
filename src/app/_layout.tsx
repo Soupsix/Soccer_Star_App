@@ -64,6 +64,7 @@ export default function RootLayout() {
         <Stack.Screen name="auth/register" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="auth/forgot-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <Stack.Screen name="news/article" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen
           name="profile/personal-info"
           options={{ headerShown: false, animation: 'slide_from_right' }}
