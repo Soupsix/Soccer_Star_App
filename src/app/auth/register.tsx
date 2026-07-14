@@ -105,7 +105,7 @@ export default function RegisterScreen() {
               Đăng Ký
             </ThemedText>
             <ThemedText style={[styles.subtitle, { color: '#A0AEC0' }]}>
-              Tạo tài khoản Football Star AI để bắt đầu dự đoán và nhận phần thưởng
+              Tạo tài khoản Soccer Star để bắt đầu dự đoán và nhận phần thưởng
             </ThemedText>
           </View>
 

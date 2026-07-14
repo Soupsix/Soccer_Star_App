@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   RefreshControl,
@@ -45,6 +46,52 @@ export default function NewsArticleScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [isTranslated, setIsTranslated] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translatedTitle, setTranslatedTitle] = useState('');
+  const [translatedTrail, setTranslatedTrail] = useState('');
+  const [translatedParagraphs, setTranslatedParagraphs] = useState<string[]>([]);
+
+  const translateText = async (text: string): Promise<string> => {
+    if (!text) return '';
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${encodeURIComponent(text)}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      return data[0].map((item: any) => item[0]).join('');
+    } catch (e) {
+      console.error('Translation error:', e);
+      return text;
+    }
+  };
+
+  const handleTranslate = async () => {
+    if (isTranslated) {
+      setIsTranslated(false);
+      return;
+    }
+
+    if (translatedTitle || translatedParagraphs.length > 0) {
+      setIsTranslated(true);
+      return;
+    }
+
+    setIsTranslating(true);
+    try {
+      if (article?.title) setTranslatedTitle(await translateText(article.title));
+      if (article?.trailText) setTranslatedTrail(await translateText(article.trailText));
+      
+      const transParagraphs = await Promise.all(paragraphs.map(p => translateText(p)));
+      setTranslatedParagraphs(transParagraphs);
+      
+      setIsTranslated(true);
+    } catch (err) {
+      Alert.alert('Lỗi', 'Không thể dịch bài viết lúc này.');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const fetchArticle = useCallback(async (isRefresh = false) => {
     if (!articleId) {
@@ -133,7 +180,28 @@ export default function NewsArticleScreen() {
             <Ionicons name="arrow-back" size={22} color={colors.text} />
           </Pressable>
           <Text style={[styles.topBarTitle, { color: colors.text }]}>News</Text>
-          <View style={styles.topBarSpacer} />
+          <View style={styles.topBarSpacer}>
+            {article && (
+              <Pressable
+                onPress={handleTranslate}
+                disabled={isTranslating}
+                style={({ pressed }) => [
+                  styles.backButton,
+                  {
+                    backgroundColor: isTranslated ? colors.primary : colors.card,
+                    borderColor: colors.border,
+                    opacity: pressed || isTranslating ? 0.74 : 1,
+                  },
+                ]}
+              >
+                {isTranslating ? (
+                  <ActivityIndicator size="small" color={isTranslated ? '#FFF' : colors.text} />
+                ) : (
+                  <Ionicons name="language-outline" size={20} color={isTranslated ? '#FFF' : colors.text} />
+                )}
+              </Pressable>
+            )}
+          </View>
         </View>
 
         <ScrollView
@@ -186,10 +254,10 @@ export default function NewsArticleScreen() {
                 </Text>
               </View>
 
-              <Text style={[styles.title, { color: colors.text }]}>{article.title}</Text>
+              <Text style={[styles.title, { color: colors.text }]}>{isTranslated && translatedTitle ? translatedTitle : article.title}</Text>
 
               {!!article.trailText && (
-                <Text style={[styles.standfirst, { color: colors.icon }]}>{article.trailText}</Text>
+                <Text style={[styles.standfirst, { color: colors.icon }]}>{isTranslated && translatedTrail ? translatedTrail : article.trailText}</Text>
               )}
 
               <View style={[styles.bylineBox, { borderColor: colors.border }]}>
@@ -198,7 +266,7 @@ export default function NewsArticleScreen() {
               </View>
 
               <View style={styles.body}>
-                {paragraphs.map((paragraph, index) => (
+                {(isTranslated && translatedParagraphs.length === paragraphs.length ? translatedParagraphs : paragraphs).map((paragraph, index) => (
                   <View
                     key={`${article.id}-${index}`}
                     style={[

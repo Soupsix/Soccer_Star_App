@@ -25,3 +25,5 @@ export interface AIRecommendation {
   reason: string;
   confidence: number;
 }
+
+export default function Ignore() { return null; }
