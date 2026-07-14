@@ -1,5 +1,5 @@
-import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import React, { useCallback, useRef, useState } from 'react';
 import {
@@ -20,10 +20,10 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuthUser } from '@/hooks/use-auth-user';
-import { useFavorites } from '@/hooks/use-favorites';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useDailyCheckin } from '@/hooks/use-daily-checkin';
+import { useFavorites } from '@/hooks/use-favorites';
 import { useVipMembership } from '@/hooks/use-vip-membership';
 import { auth } from '@/services/firebase';
 
@@ -360,7 +360,7 @@ export default function ProfileScreen() {
               <View style={[styles.menuIcon, { backgroundColor: '#FFD700' + '18' }]}>
                 <Text style={{ fontSize: 17 }}>🪙</Text>
               </View>
-              <ThemedText style={styles.menuLabel}>Lịch sử ví coin</ThemedText>
+              <ThemedText style={styles.menuLabel}>Ví coin</ThemedText>
               <View style={[styles.menuBadge, { backgroundColor: '#FFD700' + '22' }]}>
                 <Text style={[styles.menuBadgeText, { color: isDark ? '#FFA000' : '#D97706' }]}>
                   {coins.toLocaleString()}
