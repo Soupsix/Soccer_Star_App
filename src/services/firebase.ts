@@ -1,7 +1,9 @@
-import { initializeApp } from "firebase/app";
-import { initializeAuth, getReactNativePersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getApp, getApps, initializeApp } from 'firebase/app';
+import * as FirebaseAuth from 'firebase/auth';
+import type { Auth, Persistence } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // Your web app's Firebase configuration loaded from environment variables
 const firebaseConfig = {
@@ -15,10 +17,39 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
-});
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+function initializeFirebaseAuth(): Auth {
+  if (Platform.OS === 'web') {
+    return FirebaseAuth.getAuth(app);
+  }
+
+  try {
+    const getReactNativePersistence = (
+      FirebaseAuth as typeof FirebaseAuth & {
+        getReactNativePersistence: (
+          storage: typeof ReactNativeAsyncStorage,
+        ) => Persistence;
+      }
+    ).getReactNativePersistence;
+
+    return FirebaseAuth.initializeAuth(app, {
+      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+    });
+  } catch (error) {
+    if (
+      typeof error === 'object'
+      && error !== null
+      && 'code' in error
+      && error.code === 'auth/already-initialized'
+    ) {
+      return FirebaseAuth.getAuth(app);
+    }
+    throw error;
+  }
+}
+
+const auth = initializeFirebaseAuth();
 const db = getFirestore(app);
 
 export { app, auth, db };
