@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
+  Pressable,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -668,7 +669,7 @@ export default function CommunityScreen() {
                     {searchPlayerQuery.trim().length > 0 && (
                       <View style={[styles.playerSuggestions, { borderColor: colors.border }]}>
                         {filteredPlayers.map((player) => (
-                          <TouchableOpacity
+                          <Pressable
                             key={player.idPlayer}
                             style={[styles.playerSuggestItem, { borderBottomColor: colors.border }]}
                             onPress={() => {
@@ -681,7 +682,7 @@ export default function CommunityScreen() {
                               <Image source={{ uri: player.cutout || player.thumb }} style={styles.suggestAvatar} />
                               <ThemedText style={styles.suggestName}>{player.name || player.strPlayer}</ThemedText>
                             </View>
-                          </TouchableOpacity>
+                          </Pressable>
                         ))}
                         {filteredPlayers.length === 0 && (
                           <View style={{ padding: 12 }}>
@@ -699,7 +700,7 @@ export default function CommunityScreen() {
                         {favoritePlayersObjects.length > 0 ? (
                           <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={{ paddingHorizontal: 4, gap: 12 }}>
                             {favoritePlayersObjects.map((player) => (
-                              <TouchableOpacity
+                              <Pressable
                                 key={`fav-${player.idPlayer}`}
                                 style={{ alignItems: 'center', width: 64 }}
                                 onPress={() => {
@@ -717,7 +718,7 @@ export default function CommunityScreen() {
                                     {player.name || player.strPlayer}
                                   </ThemedText>
                                 </View>
-                              </TouchableOpacity>
+                              </Pressable>
                             ))}
                           </ScrollView>
                         ) : (
