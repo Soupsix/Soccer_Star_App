@@ -4,8 +4,9 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useFavorites } from "@/hooks/use-favorites";
+import { showFavoriteLimitPrompt } from "@/utils/favorite-limit";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   FlatList,
   Image,
@@ -118,7 +119,7 @@ interface PlayerCardProps {
   player: Player;
   cardWidth: number;
   isFav: boolean;
-  onToggleFav: (id: string) => void;
+  onToggleFav: (id: string) => Promise<void>;
 }
 
 const PlayerCard = ({ player, cardWidth, isFav, onToggleFav }: PlayerCardProps) => {
@@ -238,7 +239,7 @@ const PlayerCard = ({ player, cardWidth, isFav, onToggleFav }: PlayerCardProps) 
               ? styles.heartButtonActive
               : styles.heartButtonInactive,
           ]}
-          onPress={() => onToggleFav(player.idPlayer)}
+          onPress={() => void onToggleFav(player.idPlayer)}
           activeOpacity={0.75}
         >
           <Text style={styles.heartButtonIcon}>{isFav ? "❤️" : "🤍"}</Text>
@@ -253,6 +254,7 @@ const PlayerCard = ({ player, cardWidth, isFav, onToggleFav }: PlayerCardProps) 
 
 // ─── PlayersScreen ────────────────────────────────────────────────────────────
 export default function PlayersScreen() {
+  const router      = useRouter();
   const colorScheme = useColorScheme() ?? "dark";
   const colors      = Colors[colorScheme];
   const { width }   = useWindowDimensions();
@@ -266,6 +268,13 @@ export default function PlayersScreen() {
   const itemsPerPage = numCols * 3; // 3 rows per page
 
   const { isFavorite, toggleFavorite } = useFavorites();
+
+  const handleToggleFavorite = useCallback(async (playerId: string) => {
+    const result = await toggleFavorite(playerId);
+    if (result === "limit-reached") {
+      showFavoriteLimitPrompt(() => router.push("/profile/vip" as any));
+    }
+  }, [router, toggleFavorite]);
 
   const searchNormalize = (text: string) =>
     text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -366,7 +375,7 @@ export default function PlayersScreen() {
               player={item}
               cardWidth={cardWidth}
               isFav={isFavorite(item.idPlayer)}
-              onToggleFav={toggleFavorite}
+              onToggleFav={handleToggleFavorite}
             />
           )}
           ListEmptyComponent={
