@@ -28,6 +28,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuthUser } from '@/hooks/use-auth-user';
+import { useVipMembership } from '@/hooks/use-vip-membership';
 import { Colors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
@@ -72,7 +73,15 @@ function useResponsive() {
 }
 
 // ─── ViewProfile ──────────────────────────────────────────────────────────────
-function ViewProfile({ colors, user }: { colors: (typeof Colors)['dark']; user: ReturnType<typeof useAuthUser>['user'] }) {
+function ViewProfile({
+  colors,
+  user,
+  isVip,
+}: {
+  colors: (typeof Colors)['dark'];
+  user: ReturnType<typeof useAuthUser>['user'];
+  isVip: boolean;
+}) {
   const r    = useResponsive();
   const name = user?.displayName || 'Thành viên Football Star';
   const email   = user?.email    ?? '—';
@@ -92,37 +101,60 @@ function ViewProfile({ colors, user }: { colors: (typeof Colors)['dark']; user: 
 
         {/* Avatar */}
         <View style={styles.avatarBlock}>
-          {user?.photoURL ? (
-            <Image
-              source={{ uri: user.photoURL }}
-              style={{
-                width: r.avatarSize,
-                height: r.avatarSize,
-                borderRadius: r.avatarSize / 2,
-              }}
-            />
-          ) : (
-            <View
-              style={[
-                styles.avatarPlaceholder,
-                {
+          <View
+            style={[
+              styles.avatarFrame,
+              {
+                borderColor: isVip ? '#F59E0B' : colors.primary + '55',
+                borderRadius: r.avatarSize / 2 + 5,
+                padding: isVip ? 4 : 0,
+              },
+              isVip && styles.avatarFrameVip,
+            ]}
+          >
+            {user?.photoURL ? (
+              <Image
+                source={{ uri: user.photoURL }}
+                style={{
                   width: r.avatarSize,
                   height: r.avatarSize,
                   borderRadius: r.avatarSize / 2,
-                  backgroundColor: colors.primary + '25',
-                },
-              ]}
-            >
-              <IconSymbol size={r.avatarSize * 0.42} name="person.fill" color={colors.primary} />
+                }}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.avatarPlaceholder,
+                  {
+                    width: r.avatarSize,
+                    height: r.avatarSize,
+                    borderRadius: r.avatarSize / 2,
+                    backgroundColor: colors.primary + '25',
+                  },
+                ]}
+              >
+                <IconSymbol size={r.avatarSize * 0.42} name="person.fill" color={colors.primary} />
+              </View>
+            )}
+          </View>
+          {isVip && (
+            <View style={styles.vipBadgeSmall}>
+              <ThemedText style={styles.vipBadgeSmallText}>VIP</ThemedText>
             </View>
           )}
           <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />
         </View>
 
         {/* Info cards */}
-        <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <InfoRow icon="person.fill"  label="Tên hiển thị" value={name}  colors={colors} bodyFs={r.bodyFs} />
-          <InfoRow icon="envelope.fill" label="Email"        value={email} colors={colors} bodyFs={r.bodyFs} last />
+        <View style={[
+          styles.infoCard,
+          {
+            backgroundColor: colors.card,
+            borderColor: isVip ? '#F59E0B' : colors.border,
+          },
+        ]}>
+          <InfoRow icon="person.fill"  label="Tên hiển thị" value={name}  colors={colors} bodyFs={r.bodyFs} highlight={isVip} />
+          <InfoRow icon="envelope.fill" label="Email"        value={email} colors={colors} bodyFs={r.bodyFs} last highlight={isVip} />
         </View>
 
         <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -133,12 +165,15 @@ function ViewProfile({ colors, user }: { colors: (typeof Colors)['dark']; user: 
         <View
           style={[
             styles.badge,
-            { backgroundColor: colors.primary + '20', borderColor: colors.primary + '50' },
+            {
+              backgroundColor: isVip ? '#F59E0B22' : colors.primary + '20',
+              borderColor: isVip ? '#F59E0B77' : colors.primary + '50',
+            },
           ]}
         >
-          <IconSymbol size={16} name="star.fill" color={colors.primary} />
-          <ThemedText style={[styles.badgeText, { color: colors.primary }]}>
-            Thành viên Football Star
+          <IconSymbol size={16} name="star.fill" color={isVip ? '#F59E0B' : colors.primary} />
+          <ThemedText style={[styles.badgeText, { color: isVip ? '#D97706' : colors.primary }]}>
+            {isVip ? 'Thành viên VIP Football Star' : 'Thành viên Football Star'}
           </ThemedText>
         </View>
       </View>
@@ -147,10 +182,10 @@ function ViewProfile({ colors, user }: { colors: (typeof Colors)['dark']; user: 
 }
 
 function InfoRow({
-  icon, label, value, colors, last, bodyFs,
+  icon, label, value, colors, last, bodyFs, highlight,
 }: {
   icon: string; label: string; value: string;
-  colors: (typeof Colors)['dark']; last?: boolean; bodyFs: number;
+  colors: (typeof Colors)['dark']; last?: boolean; bodyFs: number; highlight?: boolean;
 }) {
   return (
     <View
@@ -159,12 +194,16 @@ function InfoRow({
         !last && { borderBottomWidth: 1, borderBottomColor: colors.border },
       ]}
     >
-      <View style={[styles.infoIconWrap, { backgroundColor: colors.primary + '18' }]}>
-        <IconSymbol size={16} name={icon as any} color={colors.primary} />
+      <View style={[styles.infoIconWrap, { backgroundColor: highlight ? '#F59E0B22' : colors.primary + '18' }]}>
+        <IconSymbol size={16} name={icon as any} color={highlight ? '#F59E0B' : colors.primary} />
       </View>
       <View style={styles.infoTextGroup}>
         <ThemedText style={styles.infoLabel}>{label}</ThemedText>
-        <ThemedText style={[styles.infoValue, { fontSize: bodyFs }]}>{value}</ThemedText>
+        <ThemedText style={[
+          styles.infoValue,
+          { fontSize: bodyFs },
+          highlight && styles.infoValueVip,
+        ]}>{value}</ThemedText>
       </View>
     </View>
   );
@@ -616,6 +655,7 @@ export default function PersonalInfoScreen() {
 
   // Reactive auth user — refreshUser() causes immediate UI update without F5
   const { user, refreshUser } = useAuthUser();
+  const { isVip } = useVipMembership();
 
   // Stable callback passed to EditProfile / ChangeAvatar
   const handleSaved = useCallback(() => {
@@ -627,7 +667,7 @@ export default function PersonalInfoScreen() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'view':          return <ViewProfile          colors={colors} user={user} />;
+      case 'view':          return <ViewProfile          colors={colors} user={user} isVip={isVip} />;
       case 'edit':          return <EditProfile          colors={colors} user={user} onSaved={handleSaved} />;
       case 'avatar':        return <ChangeAvatar         colors={colors} user={user} onSaved={handleSaved} />;
       case 'password':      return <ChangePassword       colors={colors} />;
@@ -771,7 +811,31 @@ const styles = StyleSheet.create({
   avatarBlock: {
     alignItems: 'center', marginBottom: 24, position: 'relative',
   },
+  avatarFrame: {
+    borderWidth: 2,
+  },
+  avatarFrameVip: {
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    elevation: 7,
+  },
   avatarPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  vipBadgeSmall: {
+    position: 'absolute',
+    bottom: -8,
+    alignSelf: 'center',
+    backgroundColor: '#F59E0B',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  vipBadgeSmallText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
   onlineDot: {
     width: 16, height: 16, borderRadius: 8,
     position: 'absolute', bottom: 4, right: '35%',
@@ -792,6 +856,7 @@ const styles = StyleSheet.create({
   infoTextGroup: { flex: 1 },
   infoLabel:  { fontSize: 11, color: '#A0AEC0', fontWeight: '600', letterSpacing: 0.5 },
   infoValue:  { fontWeight: '500', marginTop: 2 },
+  infoValueVip: { color: '#B45309', fontWeight: '900' },
 
   // Badge
   badge: {

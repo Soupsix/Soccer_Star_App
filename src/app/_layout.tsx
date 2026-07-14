@@ -8,11 +8,9 @@ import 'react-native-reanimated';
 
 import { auth } from '@/services/firebase';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useUserLiveSync } from '@/hooks/use-user-live-sync';
 import { Colors } from '@/constants/theme';
-import { registerWidgetTaskHandler } from 'react-native-android-widget';
-import { widgetTaskHandler } from '@/widgets/widget-task-handler';
-
-registerWidgetTaskHandler(widgetTaskHandler);
+import '@/widgets/register-widget-task-handler';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -20,6 +18,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme() ?? 'dark';
+  useUserLiveSync();
   const router = useRouter();
   const segments = useSegments();
   

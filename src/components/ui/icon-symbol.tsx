@@ -23,6 +23,7 @@ const MAPPING = {
   'person.fill': 'person',
   'person.3.fill': 'groups',
   'star.fill': 'star',
+  'heart.fill': 'favorite',
   'dollarsign.circle.fill': 'monetization-on',
   'lock.fill': 'lock',
   'eye.fill': 'visibility',

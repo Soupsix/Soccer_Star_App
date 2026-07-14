@@ -23,6 +23,7 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuthUser } from "@/hooks/use-auth-user";
 import { useFavorites } from "@/hooks/use-favorites";
+import { showFavoriteLimitPrompt } from "@/utils/favorite-limit";
 
 const { width } = Dimensions.get("window");
 
@@ -176,7 +177,10 @@ export default function PlayerDetailScreen() {
   const handleToggleFavorite = async () => {
     if (!id) return;
     try {
-      await toggleFavorite(id as string);
+      const result = await toggleFavorite(id as string);
+      if (result === "limit-reached") {
+        showFavoriteLimitPrompt(() => router.push("/profile/vip" as any));
+      }
     } catch (err) {
       console.error("Lỗi khi yêu thích cầu thủ:", err);
     }
