@@ -1,25 +1,26 @@
+import { useRouter } from 'expo-router';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { Formik } from 'formik';
 import React, { useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  TextInput,
-  TouchableOpacity,
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Formik } from 'formik';
 import * as Yup from 'yup';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 
-import { auth } from '@/services/firebase';
 import { ThemedText } from '@/components/themed-text';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { auth } from '@/services/firebase';
 
 const LoginSchema = Yup.object().shape({
   email: Yup.string()
@@ -34,7 +35,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'dark';
   const colors = Colors[colorScheme];
-  
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -69,24 +70,24 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-          
+
           {/* Logo & Header */}
           <View style={styles.headerContainer}>
             <View style={[styles.logoIcon, { backgroundColor: colors.primary + '20' }]}>
-              <IconSymbol size={48} name="paperplane.fill" color={colors.primary} />
+              <Image source={require('../../../assets/icon.png')} style={{ width: 64, height: 64 }} resizeMode="contain" />
             </View>
             <ThemedText type="title" style={[styles.title, { color: colors.text }]}>
-              Football Star <ThemedText style={{ color: colors.gold }}>AI</ThemedText>
+              Soccer Star
             </ThemedText>
             <ThemedText style={[styles.subtitle, { color: '#A0AEC0' }]}>
-              Trải nghiệm dự đoán bóng đá thông minh hàng đầu
+              Lưu giữ những khoảnh khắc cầu thủ yêu thích của bạn!
             </ThemedText>
           </View>
 
           {/* Form */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ThemedText type="subtitle" style={styles.cardTitle}>Đăng Nhập</ThemedText>
-            
+
             {errorMsg && (
               <View style={[styles.errorContainer, { backgroundColor: '#FF4D4F' + '20' }]}>
                 <ThemedText style={styles.errorText}>{errorMsg}</ThemedText>

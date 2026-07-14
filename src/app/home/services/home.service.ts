@@ -205,3 +205,5 @@ export class HomeService {
     }
   }
 }
+
+export default function Ignore() { return null; }

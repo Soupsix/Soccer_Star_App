@@ -110,9 +110,9 @@ export default function CommunityScreen() {
               widgetName: 'SoccerWidget',
               renderWidget: () => <SoccerWidget {...widgetData} />,
               widgetTaskHandler,
-            });
+            }).catch((e: any) => console.log('Widget update skipped (Expo Go or unlinked)'));
           } catch (e) {
-            console.error('Widget update error:', e);
+            console.log('Widget logic skipped:', e);
           }
         }
       } else {
@@ -238,13 +238,11 @@ export default function CommunityScreen() {
     setPosting(true);
     try {
       await CommunityService.createLocketPost(selectedPlayerId, noteText);
-      const handleOpenPostModal = () => {
-        setSelectedPlayerId('');
-        setSelectedPlayerName('');
-        setSearchPlayerQuery('');
-        setNoteText('');
-        setPostModalVisible(true);
-      };
+      setSelectedPlayerId('');
+      setSelectedPlayerName('');
+      setSearchPlayerQuery('');
+      setNoteText('');
+      setPostModalVisible(false);
       Alert.alert('Thành công', 'Locket của bạn đã được đăng lên feed!');
       loadData();
     } catch (error) {
@@ -326,8 +324,10 @@ export default function CommunityScreen() {
 
   const combinedFavoriteIds = Array.from(new Set([...favorites]));
   const favoritePlayersObjects = combinedFavoriteIds.map(fId => 
-    (playersData as any[]).find(p => p.idPlayer === fId)
+    (playersData as any[]).find(p => String(p.idPlayer || p.id) === String(fId))
   ).filter(Boolean);
+
+  const suggestedPlayers = [...favoritePlayersObjects];
 
   return (
     <ThemedView style={styles.container}>
@@ -638,7 +638,7 @@ export default function CommunityScreen() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="always">
+              <ScrollView keyboardShouldPersistTaps="handled">
                 {/* Chosen Player Display */}
                 {selectedPlayerId ? (
                   <View style={[styles.chosenPlayerCard, { backgroundColor: colors.background, borderColor: colors.border, marginTop: 12 }]}>
@@ -669,20 +669,18 @@ export default function CommunityScreen() {
                     {searchPlayerQuery.trim().length > 0 && (
                       <View style={[styles.playerSuggestions, { borderColor: colors.border }]}>
                         {filteredPlayers.map((player) => (
-                          <Pressable
-                            key={player.idPlayer}
-                            style={[styles.playerSuggestItem, { borderBottomColor: colors.border }]}
-                            onPress={() => {
-                              setSelectedPlayerId(player.idPlayer);
-                              setSelectedPlayerName(player.name || player.strPlayer);
-                              setSearchPlayerQuery('');
-                            }}
-                          >
-                            <View pointerEvents="none" style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <TouchableOpacity
+                              key={String(player.idPlayer || player.id)}
+                              style={[styles.playerSuggestItem, { borderBottomColor: colors.border }]}
+                              onPress={() => {
+                                setSelectedPlayerId(String(player.idPlayer || player.id));
+                                setSelectedPlayerName(player.name || player.strPlayer);
+                                setSearchPlayerQuery('');
+                              }}
+                            >
                               <Image source={{ uri: player.cutout || player.thumb }} style={styles.suggestAvatar} />
                               <ThemedText style={styles.suggestName}>{player.name || player.strPlayer}</ThemedText>
-                            </View>
-                          </Pressable>
+                            </TouchableOpacity>
                         ))}
                         {filteredPlayers.length === 0 && (
                           <View style={{ padding: 12 }}>
@@ -691,34 +689,32 @@ export default function CommunityScreen() {
                         )}
                       </View>
                     )}
-                    {/* Favorite players quick-select */}
+                    {/* Suggested players quick-select */}
                     {searchPlayerQuery.trim().length === 0 && (
                       <View style={{ marginTop: 12 }}>
                         <ThemedText style={{ color: '#A0AEC0', fontSize: 12, marginBottom: 8, paddingHorizontal: 4 }}>
-                          Cầu thủ yêu thích của bạn:
+                          Cầu thủ gợi ý:
                         </ThemedText>
-                        {favoritePlayersObjects.length > 0 ? (
+                        {suggestedPlayers.length > 0 ? (
                           <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={{ paddingHorizontal: 4, gap: 12 }}>
-                            {favoritePlayersObjects.map((player) => (
-                              <Pressable
-                                key={`fav-${player.idPlayer}`}
+                            {suggestedPlayers.map((player) => (
+                              <TouchableOpacity
+                                key={String(player.idPlayer || player.id)}
                                 style={{ alignItems: 'center', width: 64 }}
                                 onPress={() => {
-                                  setSelectedPlayerId(player.idPlayer);
+                                  setSelectedPlayerId(String(player.idPlayer || player.id));
                                   setSelectedPlayerName(player.name || player.strPlayer);
                                   setSearchPlayerQuery('');
                                 }}
                               >
-                                <View pointerEvents="none" style={{ alignItems: 'center' }}>
-                                  <Image 
+                                <Image 
                                     source={{ uri: player.cutout || player.thumb }} 
                                     style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: colors.primary + '20', marginBottom: 6 }} 
                                   />
-                                  <ThemedText style={{ fontSize: 10, textAlign: 'center' }} numberOfLines={1}>
+                                  <ThemedText style={{ fontSize: 10, textAlign: 'center', marginTop: 6 }} numberOfLines={1}>
                                     {player.name || player.strPlayer}
                                   </ThemedText>
-                                </View>
-                              </Pressable>
+                              </TouchableOpacity>
                             ))}
                           </ScrollView>
                         ) : (

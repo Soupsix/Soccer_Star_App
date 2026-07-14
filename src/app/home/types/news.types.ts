@@ -10,3 +10,5 @@ export interface NewsArticle {
   webUrl: string;
   publishedAt: string;
 }
+
+export default function Ignore() { return null; }

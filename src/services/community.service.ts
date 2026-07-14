@@ -390,14 +390,16 @@ export const CommunityService = {
 
       const q = query(
         collection(db, 'comments'),
-        where('postId', '==', postId),
-        orderBy('timestamp', 'asc')
+        where('postId', '==', postId)
       );
       const snap = await getDocs(q);
-      return snap.docs.map((d) => ({
+      const comments = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
       })) as Comment[];
+      
+      // Sort client-side to avoid needing a composite index
+      return comments.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     } catch (err) {
       console.error('Error fetching comments:', err);
       return [];

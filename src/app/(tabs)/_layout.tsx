@@ -20,16 +20,16 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "Tin tức",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="house.fill" color={color} />
+            <IconSymbol size={26} name="newspaper.fill" color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="matches"
         options={{
-          title: "Matches",
+          title: "Trận đấu",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="sportscourt.fill" color={color} />
           ),
@@ -38,7 +38,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="players"
         options={{
-          title: "Players",
+          title: "Cầu thủ",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="person.3.fill" color={color} />
           ),
@@ -47,7 +47,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="community"
         options={{
-          title: "Community",
+          title: "Cộng đồng",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="paperplane.fill" color={color} />
           ),
@@ -57,7 +57,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: "Cá nhân",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="person.fill" color={color} />
           ),

@@ -148,3 +148,5 @@ export class NewsService {
     return mapGuardianArticle(article);
   }
 }
+
+export default function Ignore() { return null; }
