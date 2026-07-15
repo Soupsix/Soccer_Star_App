@@ -37,40 +37,7 @@ interface AppNotification {
   timestamp: string;
 }
 
-const MOCK_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 'mock_noti_1',
-    userId: 'current_user',
-    title: 'Yêu cầu kết bạn mới 👥',
-    message: 'Nguyễn Huy đã gửi cho bạn lời mời kết bạn.',
-    isRead: false,
-    timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 mins ago
-  },
-  {
-    id: 'mock_noti_2',
-    userId: 'current_user',
-    title: 'Lượt thích mới ❤️',
-    message: 'CR7 Lover đã thích bài viết Locket của bạn về Cristiano Ronaldo.',
-    isRead: false,
-    timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString(), // 1.5 hrs ago
-  },
-  {
-    id: 'mock_noti_3',
-    userId: 'current_user',
-    title: 'Bình luận mới 💬',
-    message: 'Tùng Chelsea đã phản hồi: "Đồng quan điểm, quả đấy sút đỉnh thật!"',
-    isRead: true,
-    timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString(), // 3 hrs ago
-  },
-  {
-    id: 'mock_noti_4',
-    userId: 'current_user',
-    title: 'Trận đấu HOT hôm nay 🔥⚽',
-    message: 'Trận cầu tâm điểm giữa Real Madrid vs Barcelona sẽ diễn ra vào 02:00 đêm nay!',
-    isRead: true,
-    timestamp: new Date(Date.now() - 1000 * 60 * 600).toISOString(), // 10 hrs ago
-  }
-];
+
 
 export default function NotificationsScreen() {
   const colorScheme = useColorScheme() ?? 'dark';
@@ -86,8 +53,7 @@ export default function NotificationsScreen() {
     try {
       const q = query(
         collection(db, 'notifications'),
-        where('userId', '==', user.uid),
-        orderBy('timestamp', 'desc')
+        where('userId', '==', user.uid)
       );
       const snap = await getDocs(q);
       const list = snap.docs.map((d) => ({
@@ -95,15 +61,12 @@ export default function NotificationsScreen() {
         ...d.data(),
       })) as AppNotification[];
 
-      if (list.length === 0) {
-        // Fallback to mock data if Firestore has none
-        setNotifications(MOCK_NOTIFICATIONS);
-      } else {
-        setNotifications(list);
-      }
+      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
+      setNotifications(list);
     } catch (err) {
-      console.warn('Error loading notifications, falling back to mock data:', err);
-      setNotifications(MOCK_NOTIFICATIONS);
+      console.warn('Error loading notifications:', err);
+      setNotifications([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -127,7 +90,7 @@ export default function NotificationsScreen() {
       prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
     );
 
-    if (notificationId.startsWith('mock_')) return;
+
 
     try {
       await updateDoc(doc(db, 'notifications', notificationId), {
@@ -144,7 +107,7 @@ export default function NotificationsScreen() {
 
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
 
-    const firestoreUnreadIds = unreadIds.filter((id) => !id.startsWith('mock_'));
+    const firestoreUnreadIds = unreadIds;
     if (firestoreUnreadIds.length === 0) return;
 
     try {

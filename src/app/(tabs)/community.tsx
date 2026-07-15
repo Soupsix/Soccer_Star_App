@@ -626,11 +626,11 @@ export default function CommunityScreen() {
 
         {/* --- MODAL: CREATE POST --- */}
         <Modal visible={postModalVisible} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={[styles.modalCard, { backgroundColor: colors.card }]}
-            >
+          <KeyboardAvoidingView
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <View style={[styles.modalCard, { backgroundColor: colors.card, flex: 1, marginTop: 100 }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle">Tạo Locket Mới 📸</ThemedText>
                 <TouchableOpacity onPress={() => setPostModalVisible(false)}>
@@ -753,17 +753,17 @@ export default function CommunityScreen() {
                   </>
                 )}
               </TouchableOpacity>
-            </KeyboardAvoidingView>
-          </View>
+            </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* --- MODAL: COMMENTS & REACTIONS --- */}
         <Modal visible={commentsModalVisible} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={[styles.modalCard, { backgroundColor: colors.card, height: '70%' }]}
-            >
+          <KeyboardAvoidingView
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <View style={[styles.modalCard, { backgroundColor: colors.card, flex: 1, marginTop: 100 }]}>
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle">Bình luận 💬</ThemedText>
                 <TouchableOpacity onPress={() => setCommentsModalVisible(false)}>
@@ -825,8 +825,8 @@ export default function CommunityScreen() {
                   )}
                 </TouchableOpacity>
               </View>
-            </KeyboardAvoidingView>
-          </View>
+            </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Reaction Picker Component */}
