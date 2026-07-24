@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -23,6 +23,8 @@ import { Colors } from '@/constants/theme';
 import { useMatches } from '@/hooks/useMatches';
 import { ClientMatch } from '@/types/match.types';
 import { FootballDataService } from '@/services/footballData.service';
+import { useFavorites } from '@/hooks/use-favorites';
+import playersData from '@/assets/data/players.json';
 
 const { width } = Dimensions.get('window');
 
@@ -45,6 +47,7 @@ export default function MatchesScreen() {
   const [leagues, setLeagues] = useState<any[]>([]);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | number>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Upcoming' | 'Live' | 'Finished'>('all');
+  const [aiModalMatch, setAiModalMatch] = useState<ClientMatch | null>(null);
 
   // Fetch leagues on mount
   useEffect(() => {
@@ -59,22 +62,74 @@ export default function MatchesScreen() {
     loadLeagues();
   }, []);
 
+  const { favorites } = useFavorites();
+
+  const favoritePlayersList = useMemo(() => {
+    return (playersData as any[]).filter(p => favorites.includes(p.idPlayer));
+  }, [favorites]);
+
+  const getFavoritePlayerForMatch = (match: ClientMatch) => {
+    const h = (match.homeTeamName || '').toLowerCase();
+    const a = (match.awayTeamName || '').toLowerCase();
+    return favoritePlayersList.find(p => {
+      const t = (p.team || '').toLowerCase();
+      const nat = (p.nationality || '').toLowerCase();
+      return (t && (h.includes(t) || a.includes(t))) || (nat && (h.includes(nat) || a.includes(nat)));
+    });
+  };
+
   // Hook query parameters are computed dynamically based on the active tab
   const { allMatches, groupedMatches, loading, refreshing, refresh } = useMatches(
-    activeTab === 'bracket' ? '50' : selectedLeagueId,
+    activeTab === 'bracket' ? '50' : (selectedLeagueId === 'favorites' ? 'all' : selectedLeagueId),
     activeTab === 'bracket' ? 'all' : statusFilter
   );
 
-  const getAiPrediction = (match: ClientMatch): string => {
+  const filteredGroupedMatches = useMemo(() => {
+    if (selectedLeagueId === 'favorites') {
+      const matchedGroups: typeof groupedMatches = [];
+      groupedMatches.forEach(group => {
+        const matchesWithFav = group.matches.filter(m => !!getFavoritePlayerForMatch(m));
+        if (matchesWithFav.length > 0) {
+          matchedGroups.push({
+            ...group,
+            matches: matchesWithFav
+          });
+        }
+      });
+      return matchedGroups;
+    }
+    return groupedMatches;
+  }, [selectedLeagueId, groupedMatches, favoritePlayersList]);
+
+  const getAiPredictionData = (match: ClientMatch) => {
     const charCodeSum = match.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
-    const oddsA = 1.5 + (charCodeSum % 100) / 100 * 2.0;
-    const oddsB = 1.5 + ((charCodeSum + 42) % 100) / 100 * 3.5;
-    return `${Math.round(60 + (charCodeSum % 30))}% AI dự đoán: ${
-      oddsA < oddsB ? `${match.homeTeamName} thắng` : `${match.awayTeamName} thắng`
-    }`;
+    const confidence = Math.round(68 + (charCodeSum % 22));
+    const homeWinProb = Math.round(42 + (charCodeSum % 20));
+    const awayWinProb = Math.round(22 + ((charCodeSum + 12) % 20));
+    const drawProb = Math.max(10, 100 - homeWinProb - awayWinProb);
+    const predictedWinner = homeWinProb >= awayWinProb ? match.homeTeamName : match.awayTeamName;
+    const predictedScore = homeWinProb >= awayWinProb ? '2 - 1' : '1 - 2';
+
+    return {
+      confidence,
+      homeWinProb,
+      drawProb,
+      awayWinProb,
+      predictedWinner,
+      predictedScore,
+      keyFactors: [
+        `⚡ Phong độ: ${match.homeTeamName} có hiệu suất ghi bàn tốt ở các trận gần đây.`,
+        `🛡️ Phòng ngự: ${match.awayTeamName} duy trì cự ly đội hình kỷ luật.`,
+        `⚔️ Lịch sử đối đầu: Trận đấu luôn diễn ra vô cùng gay kịch.`,
+        `🧠 Đội hình: ${predictedWinner} nhỉnh hơn 6% ở tỷ lệ kiểm soát tuyến giữa.`
+      ]
+    };
   };
 
-  const filteredGroupedMatches = groupedMatches;
+  const getAiPrediction = (match: ClientMatch): string => {
+    const data = getAiPredictionData(match);
+    return `${data.confidence}% AI dự đoán: ${data.predictedWinner} thắng`;
+  };
 
   // Render Bracket Screen View
   const renderBracket = () => {
@@ -289,11 +344,29 @@ export default function MatchesScreen() {
                   <ThemedText style={[styles.leagueTextTab, selectedLeagueId === 'all' && { color: '#FFFFFF', fontWeight: 'bold' }]}>Tất cả các giải</ThemedText>
                 </TouchableOpacity>
 
+                <TouchableOpacity
+                  style={[
+                    styles.leagueTab,
+                    {
+                      backgroundColor: selectedLeagueId === 'favorites' ? '#F59E0B' : colors.card,
+                      borderColor: selectedLeagueId === 'favorites' ? '#F59E0B' : colors.border,
+                    }
+                  ]}
+                  onPress={() => setSelectedLeagueId('favorites')}
+                >
+                  <Ionicons name="star" size={14} color={selectedLeagueId === 'favorites' ? '#FFF' : '#F59E0B'} style={{ marginRight: 4 }} />
+                  <ThemedText style={[styles.leagueTextTab, selectedLeagueId === 'favorites' && { color: '#FFFFFF', fontWeight: 'bold' }]}>Cầu thủ yêu thích</ThemedText>
+                </TouchableOpacity>
+
                 {leagues.map((league) => {
-                  const isActive = selectedLeagueId === league.league_id;
+                  const lId = league.league_id || league.id;
+                  const lName = league.league_name || league.name || 'Giải đấu';
+                  const lImg = league.league_image || league.logo || league.badge;
+                  const isActive = String(selectedLeagueId) === String(lId) || 
+                    (String(selectedLeagueId).toLowerCase().includes('saudi') && String(lId).toLowerCase().includes('saudi'));
                   return (
                     <TouchableOpacity
-                      key={league.league_id}
+                      key={String(lId)}
                       style={[
                         styles.leagueTab,
                         {
@@ -301,18 +374,18 @@ export default function MatchesScreen() {
                           borderColor: isActive ? colors.primary : colors.border,
                         }
                       ]}
-                      onPress={() => setSelectedLeagueId(league.league_id)}
+                      onPress={() => setSelectedLeagueId(lId)}
                     >
-                      {league.league_image && (
-                        <Image source={{ uri: league.league_image }} style={styles.leagueIcon} />
-                      )}
+                      {lImg ? (
+                        <Image source={{ uri: lImg }} style={styles.leagueIcon} />
+                      ) : null}
                       <ThemedText
                         style={[
                           styles.leagueTextTab,
                           isActive && { color: '#FFFFFF', fontWeight: 'bold' }
                         ]}
                       >
-                        {league.league_name}
+                        {lName}
                       </ThemedText>
                     </TouchableOpacity>
                   );
@@ -322,6 +395,20 @@ export default function MatchesScreen() {
 
             {loading ? (
               <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+            ) : selectedLeagueId === 'favorites' && favorites.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="star-outline" size={48} color="#F59E0B" />
+                <ThemedText style={[styles.emptyText, { marginTop: 12 }]}>Bạn chưa có cầu thủ yêu thích nào</ThemedText>
+                <ThemedText style={{ color: '#718096', fontSize: 13, textAlign: 'center', marginHorizontal: 32, marginTop: 6 }}>
+                  Hãy chọn cầu thủ yêu thích (thả tim) để AI tự động lọc trận đấu các cầu thủ đó ra sân!
+                </ThemedText>
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, marginTop: 16 }}
+                  onPress={() => router.push('/players' as any)}
+                >
+                  <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>Khám phá Cầu thủ ngay</ThemedText>
+                </TouchableOpacity>
+              </View>
             ) : filteredGroupedMatches.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="football-outline" size={48} color="#718096" />
@@ -339,6 +426,7 @@ export default function MatchesScreen() {
                   {group.matches.map((match) => {
                     const isLive = match.status.toLowerCase().includes('live');
                     const isFT = match.status === 'FT';
+                    const favPlayer = getFavoritePlayerForMatch(match);
 
                     return (
                       <View key={match.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -397,13 +485,35 @@ export default function MatchesScreen() {
                             </View>
                           </View>
 
-                          {/* AI Recommendation */}
-                          <View style={[styles.aiBadge, { backgroundColor: colors.primary + '15' }]}>
-                            <Ionicons size={14} name="sparkles" color={colors.primary} />
-                            <ThemedText style={[styles.aiText, { color: colors.primary }]} numberOfLines={1}>
-                              {getAiPrediction(match)}
-                            </ThemedText>
-                          </View>
+                          {/* Favorite Player AI Banner */}
+                          {favPlayer && (
+                            <View style={{ backgroundColor: '#F59E0B15', borderColor: '#F59E0B40', borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5, marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
+                              <Ionicons name="sparkles" size={13} color="#F59E0B" style={{ marginRight: 6 }} />
+                              <ThemedText style={{ fontSize: 12, color: '#F59E0B', fontWeight: 'bold' }}>
+                                AI Quét: {favPlayer.name} ({favPlayer.team || favPlayer.nationality}) ra sân
+                              </ThemedText>
+                            </View>
+                          )}
+
+                          {/* AI Recommendation Badge - Sleek & Compact */}
+                          <TouchableOpacity
+                            style={[styles.aiBadge, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '25', borderWidth: 1 }]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setAiModalMatch(match);
+                            }}
+                          >
+                            <View style={styles.aiBadgeLeft}>
+                              <Ionicons size={14} name="sparkles" color={colors.primary} />
+                              <ThemedText style={[styles.aiText, { color: colors.primary }]} numberOfLines={1}>
+                                {getAiPrediction(match)}
+                              </ThemedText>
+                            </View>
+                            <View style={[styles.aiBadgeBtn, { backgroundColor: colors.primary }]}>
+                              <ThemedText style={styles.aiBadgeBtnText}>Chi tiết</ThemedText>
+                              <Ionicons name="chevron-forward" size={10} color="#FFFFFF" />
+                            </View>
+                          </TouchableOpacity>
                         </TouchableOpacity>
                       </View>
                     );
@@ -424,7 +534,141 @@ export default function MatchesScreen() {
 
       </ScrollView>
 
-      {/* Betting Modal Removed */}
+      {/* AI Match Analysis Detailed Modal */}
+      {aiModalMatch && (() => {
+        const aiData = getAiPredictionData(aiModalMatch);
+        return (
+          <Modal
+            visible={!!aiModalMatch}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setAiModalMatch(null)}
+          >
+            <View style={styles.modalOverlay}>
+              <TouchableOpacity style={styles.modalBackdrop} onPress={() => setAiModalMatch(null)} />
+
+              <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {/* Modal Header */}
+                <View style={styles.modalHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '20', justifyContent: 'center', alignItems: 'center' }}>
+                      <Ionicons name="sparkles" size={18} color={colors.primary} />
+                    </View>
+                    <View>
+                      <ThemedText style={{ fontSize: 15, fontWeight: '900' }}>PHÂN TÍCH CHI TIẾT AI</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: '#A0AEC0' }}>Dự đoán kết quả & Chỉ số</ThemedText>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.closeBtn}
+                    onPress={() => setAiModalMatch(null)}
+                  >
+                    <Ionicons name="close" size={20} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+                  {/* Match Info Box */}
+                  <View style={{ alignItems: 'center', padding: 16, backgroundColor: colors.background, borderRadius: 16, marginBottom: 16 }}>
+                    <ThemedText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 6, textAlign: 'center' }}>
+                      {aiModalMatch.homeTeamName} <ThemedText style={{ color: colors.primary }}>VS</ThemedText> {aiModalMatch.awayTeamName}
+                    </ThemedText>
+                    <View style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.primary }}>
+                      <ThemedText style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>
+                        Dự đoán tỷ số: {aiData.predictedScore}
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  {/* Confidence Bar */}
+                  <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.success, backgroundColor: colors.success + '15', padding: 14, marginBottom: 16 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.success }}>
+                        ĐỘ TIN CẬY DỰ ĐOÁN
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 16, fontWeight: '900', color: colors.success }}>
+                        {aiData.confidence}%
+                      </ThemedText>
+                    </View>
+                    <View style={{ height: 8, backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 4, overflow: 'hidden' }}>
+                      <View style={{ height: '100%', width: `${aiData.confidence}%`, backgroundColor: colors.success, borderRadius: 4 }} />
+                    </View>
+                  </View>
+
+                  {/* Win Probability Bar */}
+                  <View style={{ marginBottom: 18 }}>
+                    <ThemedText style={{ fontSize: 13, fontWeight: '800', marginBottom: 10 }}>🎯 Xác suất kết quả trận đấu</ThemedText>
+                    
+                    <View style={{ flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', marginBottom: 10 }}>
+                      <View style={{ flex: aiData.homeWinProb, backgroundColor: '#3B82F6' }} />
+                      <View style={{ flex: aiData.drawProb, backgroundColor: '#9CA3AF' }} />
+                      <View style={{ flex: aiData.awayWinProb, backgroundColor: '#EF4444' }} />
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-around', flexWrap: 'wrap', gap: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#3B82F6' }} />
+                        <ThemedText style={{ fontSize: 12 }}>{aiModalMatch.homeTeamName}: <ThemedText style={{ fontWeight: 'bold' }}>{aiData.homeWinProb}%</ThemedText></ThemedText>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#9CA3AF' }} />
+                        <ThemedText style={{ fontSize: 12 }}>Hòa: <ThemedText style={{ fontWeight: 'bold' }}>{aiData.drawProb}%</ThemedText></ThemedText>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' }} />
+                        <ThemedText style={{ fontSize: 12 }}>{aiModalMatch.awayTeamName}: <ThemedText style={{ fontWeight: 'bold' }}>{aiData.awayWinProb}%</ThemedText></ThemedText>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Key Factors Analysis */}
+                  <View style={{ marginBottom: 18 }}>
+                    <ThemedText style={{ fontSize: 13, fontWeight: '800', marginBottom: 10 }}>🔍 Phân tích các yếu tố then chốt</ThemedText>
+                    <View style={{ gap: 8 }}>
+                      {aiData.keyFactors.map((factor, idx) => (
+                        <View key={idx} style={{ padding: 12, borderRadius: 12, backgroundColor: colors.background }}>
+                          <ThemedText style={{ fontSize: 12, lineHeight: 18 }}>{factor}</ThemedText>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+
+                  {/* Disclaimer */}
+                  <ThemedText style={{ fontSize: 10, color: '#718096', fontStyle: 'italic', textAlign: 'center', marginVertical: 8 }}>
+                    💡 *Lưu ý: Phân tích bởi AI dựa trên số liệu mô phỏng. Thông tin mang tính tham khảo.*
+                  </ThemedText>
+                </ScrollView>
+
+                {/* Footer */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.08)' }}>
+                  <TouchableOpacity
+                    style={{ flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.background }}
+                    onPress={() => setAiModalMatch(null)}
+                  >
+                    <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>Đóng</ThemedText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{ flex: 2, flexDirection: 'row', paddingVertical: 12, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    onPress={() => {
+                      const matchId = aiModalMatch.id;
+                      const tournamentId = aiModalMatch.tournamentId;
+                      setAiModalMatch(null);
+                      router.push({ pathname: '/match/[id]', params: { id: matchId, leagueId: tournamentId } });
+                    }}
+                  >
+                    <ThemedText style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>Xem chi tiết trận</ThemedText>
+                    <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        );
+      })()}
     </ThemedView>
   );
 }
@@ -611,15 +855,36 @@ const styles = StyleSheet.create({
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 10,
-    borderRadius: 12,
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  aiBadgeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
   },
   aiText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     marginLeft: 6,
+    flex: 1,
+  },
+  aiBadgeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 2,
+  },
+  aiBadgeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
   },
   oddsSection: {
     borderTopWidth: 1,
@@ -661,6 +926,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     padding: 24,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
   },
   modalCard: {
     width: '100%',

@@ -423,7 +423,9 @@ export default function CommunityScreen() {
                         )}
                         {/* Player name badge */}
                         <View style={styles.playerNameBadge}>
-                          <ThemedText style={styles.playerNameText}>⚽ {item.playerName}</ThemedText>
+                          <ThemedText style={styles.playerNameText} numberOfLines={2} ellipsizeMode="tail">
+                            ⚽ {item.playerName}
+                          </ThemedText>
                         </View>
                       </View>
 
@@ -700,7 +702,7 @@ export default function CommunityScreen() {
                             {suggestedPlayers.map((player) => (
                               <TouchableOpacity
                                 key={String(player.idPlayer || player.id)}
-                                style={{ alignItems: 'center', width: 64 }}
+                                style={{ alignItems: 'center', width: 76 }}
                                 onPress={() => {
                                   setSelectedPlayerId(String(player.idPlayer || player.id));
                                   setSelectedPlayerName(player.name || player.strPlayer);
@@ -709,9 +711,9 @@ export default function CommunityScreen() {
                               >
                                 <Image 
                                     source={{ uri: player.cutout || player.thumb }} 
-                                    style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: colors.primary + '20', marginBottom: 6 }} 
+                                    style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary + '20', marginBottom: 4 }} 
                                   />
-                                  <ThemedText style={{ fontSize: 10, textAlign: 'center', marginTop: 6 }} numberOfLines={1}>
+                                  <ThemedText style={{ fontSize: 10, textAlign: 'center', marginTop: 2, lineHeight: 13 }} numberOfLines={2} ellipsizeMode="tail">
                                     {player.name || player.strPlayer}
                                   </ThemedText>
                               </TouchableOpacity>
@@ -960,17 +962,21 @@ const styles = StyleSheet.create({
   playerNameBadge: {
     position: 'absolute',
     bottom: 12,
-    backgroundColor: 'rgba(13, 17, 23, 0.85)',
-    paddingHorizontal: 12,
+    maxWidth: '90%',
+    backgroundColor: 'rgba(13, 17, 23, 0.88)',
+    paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   playerNameText: {
     color: '#FFF',
     fontSize: 12,
     fontWeight: '700',
+    textAlign: 'center',
   },
   noteContainer: {
     marginTop: 12,

@@ -27,16 +27,18 @@ export function useMatches(selectedLeagueId: string | number, statusFilter: 'all
       if (selectedLeagueId && selectedLeagueId !== 'all') {
         rawMatches = await FootballDataService.getMatchesForLeague(selectedLeagueId);
       } else {
-        // Fetch general upcoming/results + always include World Cup explicitly
-        const [upcomingData, resultsData, wcData] = await Promise.all([
-          FootballDataService.getUpcomingMatches(),
-          FootballDataService.getResults(),
-          FootballDataService.getMatchesForLeague(50) // Always include World Cup 2026 matches
+        // Fetch general upcoming/results + always include World Cup & Saudi Pro League explicitly
+        const [upcomingData, resultsData, wcData, saudiData] = await Promise.all([
+          FootballDataService.getUpcomingMatches().catch(() => ({ matches: [] })),
+          FootballDataService.getResults().catch(() => ({ matches: [] })),
+          FootballDataService.getMatchesForLeague(50).catch(() => []), // World Cup 2026 matches
+          FootballDataService.getMatchesForLeague('saudi_pro_league').catch(() => []) // Saudi Pro League matches
         ]);
         const combined = [
           ...(upcomingData.matches || []),
           ...(resultsData.matches || []),
           ...(wcData || []),
+          ...(saudiData || []),
         ];
         // Deduplicate by match_id
         const seen = new Set<string>();
