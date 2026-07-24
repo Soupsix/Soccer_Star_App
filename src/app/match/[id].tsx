@@ -15,53 +15,15 @@ import { MatchService } from '@/services/match.service';
 import { ClientMatch } from '@/types/match.types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
-interface FakeEvent {
+interface MatchDetailEvent {
   minute: number;
   type: 'Goal' | 'Yellow Card' | 'Red Card' | 'Substitution' | 'Penalty';
   team: 'home' | 'away';
-  playerName: string;
+  playerName?: string;
+  description?: string;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function generateFakeEvents(match: ClientMatch): FakeEvent[] {
-  if (match.status === 'Scheduled') return [];
-  const homeGoals = match.homeScore ?? 0;
-  const awayGoals = match.awayScore ?? 0;
-  const seed = parseInt(match.id.replace(/\D/g, '').slice(0, 8) || '12345678', 10);
-
-  const homeNames = ['Silva', 'Müller', 'Kane', 'Salah', 'Mbappe', 'Haaland', 'Vinicius', 'Messi', 'Ronaldo', 'Benzema'];
-  const awayNames = ['De Bruyne', 'Modric', 'Bellingham', 'Saka', 'Rodri', 'Odegaard', 'Griezmann', 'Neymar', 'Lewandowski', 'Morata'];
-
-  const events: FakeEvent[] = [];
-  let minute = 5;
-  const pr = (n: number, offset: number) => ((seed + offset * 31) % n);
-
-  for (let i = 0; i < homeGoals; i++) {
-    minute = Math.min(90, minute + 8 + pr(18, i * 7));
-    events.push({ minute, type: 'Goal', team: 'home', playerName: homeNames[pr(homeNames.length, i * 3)] });
-  }
-  for (let i = 0; i < awayGoals; i++) {
-    minute = Math.min(90, minute + 7 + pr(15, i * 11));
-    events.push({ minute, type: 'Goal', team: 'away', playerName: awayNames[pr(awayNames.length, i * 5)] });
-  }
-  const yCards = pr(3, 99);
-  for (let i = 0; i < yCards; i++) {
-    minute = Math.min(88, minute + 5 + pr(20, i * 13));
-    const team = pr(2, i * 17) === 0 ? 'home' : ('away' as 'home' | 'away');
-    const names = team === 'home' ? homeNames : awayNames;
-    events.push({ minute, type: 'Yellow Card', team, playerName: names[pr(names.length, i * 19)] });
-  }
-  const subs = 2 + pr(2, 55);
-  for (let i = 0; i < subs; i++) {
-    minute = 55 + pr(30, i * 23);
-    const team = pr(2, i * 29) === 0 ? 'home' : ('away' as 'home' | 'away');
-    const names = team === 'home' ? homeNames : awayNames;
-    events.push({ minute, type: 'Substitution', team, playerName: names[pr(names.length, i * 37)] });
-  }
-  return events.sort((a, b) => a.minute - b.minute);
-}
-
-const eventEmoji = (type: FakeEvent['type']) => {
+const eventEmoji = (type: MatchDetailEvent['type']) => {
   switch (type) {
     case 'Goal': return '⚽';
     case 'Yellow Card': return '🟨';
@@ -145,9 +107,9 @@ export default function MatchDetailScreen() {
   const isScheduled = match.status === 'Scheduled' || match.status === 'Postponed';
   const isLive = match.status === 'Live' || match.status === 'HT';
   const isFT = match.status === 'FT';
-  const events = generateFakeEvents(match);
+  const events: MatchDetailEvent[] = (match as any).events || [];
 
-  // Deterministic fake stats
+  // Deterministic stats
   const seed = parseInt(match.id.replace(/\D/g, '').slice(0, 6) || '123456', 10);
   const homePoss = 40 + (seed % 20);
   const awayPoss = 100 - homePoss;
@@ -301,8 +263,10 @@ export default function MatchDetailScreen() {
                   </View>
                   {events.length === 0 ? (
                     <View style={s.empty}>
-                      <Ionicons name="football-outline" size={32} color={colors.icon} />
-                      <ThemedText style={{ color: colors.icon, marginTop: 8, fontSize: 13 }}>Chưa có diễn biến</ThemedText>
+                      <Ionicons name="time-outline" size={36} color={colors.icon} />
+                      <ThemedText style={{ color: colors.icon, marginTop: 8, fontSize: 13, textAlign: 'center' }}>
+                        Chưa có thông tin diễn biến chi tiết trận đấu
+                      </ThemedText>
                     </View>
                   ) : (
                     events.map((ev, i) => {

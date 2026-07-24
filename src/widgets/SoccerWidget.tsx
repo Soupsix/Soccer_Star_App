@@ -98,7 +98,8 @@ export function SoccerWidget({ type, title, subtitle, content, time, imageUrl }:
           >
             <TextWidget
               text={title || '❤️ Friend Locket'}
-              style={{ fontSize: 14, color: '#FF9100', fontWeight: 'bold', marginBottom: 4 }}
+              style={{ fontSize: 13, color: '#FF9100', fontWeight: 'bold', marginBottom: 4 }}
+              maxLines={2}
             />
             <TextWidget
               text={`"${content}"`}
@@ -128,7 +129,8 @@ export function SoccerWidget({ type, title, subtitle, content, time, imageUrl }:
     >
       <TextWidget
         text={title || '❤️ Friend Locket'}
-        style={{ fontSize: 14, color: '#FF9100', fontWeight: 'bold', marginBottom: 8 }}
+        style={{ fontSize: 13, color: '#FF9100', fontWeight: 'bold', marginBottom: 8 }}
+        maxLines={2}
       />
       <TextWidget
         text={`"${content}"`}

@@ -19,6 +19,8 @@
     "seed:players": "npx ts-node -P scripts/tsconfig.json scripts/seedPlayers.ts"
   },
   "dependencies": {
+    "@emnapi/core": "1.11.2",
+    "@emnapi/runtime": "1.11.2",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.4.0",

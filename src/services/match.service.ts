@@ -67,76 +67,12 @@ export class MatchService {
       const match = await this.getMatchById(matchId);
       if (!match || match.status === 'Scheduled') return [];
 
-      const events: MatchEvent[] = [];
-      const homeScore = match.homeScore || 0;
-      const awayScore = match.awayScore || 0;
-
-      // Home goals
-      for (let i = 0; i < homeScore; i++) {
-        const minute = homeScore === 1 ? 34 : Math.floor(15 + i * (65 / homeScore));
-        events.push({
-          id: `g_h_${matchId}_${i}`,
-          matchId: matchId,
-          minute,
-          type: 'Goal',
-          teamId: match.homeTeamId,
-          playerId: null,
-          description: `VÀO! Bàn thắng mở tỉ số hoặc ghi bàn cho ${match.homeTeamName}`,
-          createdAt: new Date().toISOString()
-        });
+      // Return real events if present on match object
+      if ((match as any)?.events && Array.isArray((match as any).events)) {
+        return (match as any).events;
       }
 
-      // Away goals
-      for (let i = 0; i < awayScore; i++) {
-        const minute = awayScore === 1 ? 58 : Math.floor(22 + i * (58 / awayScore));
-        events.push({
-          id: `g_a_${matchId}_${i}`,
-          matchId: matchId,
-          minute,
-          type: 'Goal',
-          teamId: match.awayTeamId,
-          playerId: null,
-          description: `VÀO! Bàn thắng ghi bàn cho ${match.awayTeamName}`,
-          createdAt: new Date().toISOString()
-        });
-      }
-
-      // Add a couple yellow cards
-      events.push({
-        id: `yc_h_${matchId}`,
-        matchId: matchId,
-        minute: 27,
-        type: 'Yellow Card',
-        teamId: match.homeTeamId,
-        playerId: null,
-        description: `Thẻ vàng dành cho cầu thủ của ${match.homeTeamName}`,
-        createdAt: new Date().toISOString()
-      });
-
-      events.push({
-        id: `yc_a_${matchId}`,
-        matchId: matchId,
-        minute: 68,
-        type: 'Yellow Card',
-        teamId: match.awayTeamId,
-        playerId: null,
-        description: `Thẻ vàng dành cho cầu thủ của ${match.awayTeamName}`,
-        createdAt: new Date().toISOString()
-      });
-
-      // Add a substitution
-      events.push({
-        id: `sub_h_${matchId}`,
-        matchId: matchId,
-        minute: 70,
-        type: 'Substitution',
-        teamId: match.homeTeamId,
-        playerId: null,
-        description: `Thay người: Thay đổi nhân sự chiến thuật của ${match.homeTeamName}`,
-        createdAt: new Date().toISOString()
-      });
-
-      return events.sort((a, b) => a.minute - b.minute);
+      return [];
     } catch (error) {
       console.error(`Error in getMatchEvents for ${matchId}:`, error);
       return [];
